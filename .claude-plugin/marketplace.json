@@ -1,0 +1,14 @@
+{
+  "name": "agent-workflow",
+  "description": "Head (planner) + executor agent workflow for any project, with evidence and secret checks.",
+  "owner": {
+    "name": "Abraham.r"
+  },
+  "plugins": [
+    {
+      "name": "agent-workflow",
+      "source": "./plugins/agent-workflow",
+      "description": "Set up or audit a head/executor agent workflow with file-based handoff, evidence checks, and tasks tuned to the executor model's capacity."
+    }
+  ]
+}
