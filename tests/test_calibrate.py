@@ -64,7 +64,8 @@ try:
     (proj / "handoff").mkdir(parents=True)
     d = proj / "handoff" / "calibration"
     r = jalan(["create", "--seed", "4242"], proj)
-    cek(r.returncode == 0 and "Seed: 4242" in r.stdout and "nilai --seed 4242" in r.stdout, "buat: exit 0, mencetak seed dan perintah nilai")
+    cek(r.returncode == 0 and "Seed: 4242" in r.stdout and "grade --seed 4242" in r.stdout and not re.search(r"\bnilai\b", r.stdout),
+        "create: exit 0, mencetak seed dan perintah grade (bukan nama lama nilai)")
     simpan = list(SEEDS.glob("*.txt"))
     cek(len(simpan) == 1 and "seed=4242" in simpan[0].read_text(encoding="utf-8") and proj not in simpan[0].parents,
         "buat: seed disimpan di luar folder project (AGENT_WORKFLOW_SEED_DIR)")

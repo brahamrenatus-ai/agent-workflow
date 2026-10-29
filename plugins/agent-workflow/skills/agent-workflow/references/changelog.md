@@ -258,6 +258,19 @@ Perubahan lain tanpa penanda baru: placeholder `--help` berbahasa Inggris di `re
 | N12 | Kutipan report lama ke `asal.jsonl` atau `STRUKTUR.md` dibaca dari nama barunya; kutipan ke salinan alat lama menyebut nama barunya | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py`, setelah dibandingkan dengan salinan project (tambalan lokal dipertahankan) | – |
 | N13 | `--staged` menyertakan file yang berganti nama; status ignore file secret dicek di repo file itu | `handoff/tools/check_secrets.py` | Salin ulang `scripts/check_secrets.py`, dengan `SECRET_FILES` project dipertahankan | – |
 
+## v3.13 (2026-10-29): konfirmasi worker, akun worker Claude, pesan `calibrate.py`
+Berasal dari uji dispatch Orca di IoT SCADA sesudah setelan izin agen diubah (Claude Code `Approve for me`, Antigravity setelan sendiri). Tiga hal muncul di sana:
+- Antigravity dengan setelannya sendiri meminta konfirmasi untuk setiap perintah, termasuk perintah Orca dari preamble, dan permintaan itu tidak tampil di `check` maupun `worker-list`. Head yang hanya menunggu `check --wait` tertahan sampai timeout. Dialog batas pemakaian akun Claude Code juga hanya terlihat di terminal, lengkap dengan pilihan berbayar.
+- `worker-start --agent claude` memakai login Claude Code bawaan, bukan akun sesi head yang diatur lewat `CLAUDE_CONFIG_DIR`. Worker uji jatuh ke akun yang kuotanya habis.
+- Pesan `calibrate.py create` masih menyebut subperintah lama `nilai`.
+
+Perubahan lain tanpa penanda baru: `references/orca.md` (§Akun Claude worker, pilihan untuk Antigravity, kalibrasi lewat terminal sendiri), `references/enforcement.md` §Orca (perilaku Antigravity, konfirmasi yang diserahkan ke head), butir **Orca** di T3 (siapa yang menjawab konfirmasi; `Full access` hanya atas keputusan user), dan pesan `calibrate.py create` yang kini menyebut `grade`.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| D7 | Head membaca terminal worker di antara tunggu, karena konfirmasi alat dan dialog batas pemakaian tidak tampil di `check`/`worker-list`. Konfirmasi dijawab user, atau head untuk perintah langkah task bila user menyerahkannya. Di dialog batas pemakaian tidak ada opsi berbayar yang dipilih; worker dihentikan dengan `worker-stop` | instruksi head | T1 §Executor lewat Orca (butir **Konfirmasi dan dialog di terminal worker**; butir Tunggu memakai timeout pendek) | Penyerahan konfirmasi ke head: keputusan user |
+| D8 | Worker Claude Code memakai akun sesi head: bila `CLAUDE_CONFIG_DIR` sesi head berisi, worker diluncurkan di terminal sendiri lalu diserahi task dengan `worker-start --terminal`; bukti model dari header dan transkrip; terminal ditutup sesudah release | instruksi head | T1 §Executor lewat Orca (butir **Worker Claude Code memakai akun sesi head**) | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -365,4 +378,6 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.12 N11   readme~check_evidence
 3.12.1 N12 file:handoff/tools/check_evidence.py~NAMA_V312
 3.12.1 N13 file:handoff/tools/check_secrets.py~--diff-filter=ACMR  @bila_secret
+3.13 D7    head~worker-read  @bila_orca
+3.13 D8    head~CLAUDE_CONFIG_DIR  @bila_orca
 ```

@@ -2,7 +2,7 @@
 
 Dibaca dari `SKILL.md` saat BOOTSTRAP, AUDIT, atau upgrade, bila head menjalankan executor lewat Orca. Orca adalah aplikasi yang meluncurkan agen CLI (Claude Code, Antigravity, Codex, …) di terminal yang diawasinya. Dalam susunan ini head menjadi **koordinator**: ia memilih model per task, meluncurkan executor, menunggu `worker_done`, lalu mentriase report seperti biasa. File di `handoff/` tetap sumber kebenaran; Orca hanya jalur peluncuran dan kabar.
 
-Ditulis dan dicek dengan Orca 1.4.243. Panduan yang cocok dengan versi terpasang dicetak oleh `orca skills get orchestration`; bila isinya berbeda dengan file ini, panduan itulah yang benar. Di Linux, `orca` di luar terminal Orca biasanya pembaca layar GNOME, jadi pakai `orca-ide` (dijelaskan di panduan itu).
+Ditulis dengan Orca 1.4.243 dan dicek ulang dengan 1.4.244. Panduan yang cocok dengan versi terpasang dicetak oleh `orca skills get orchestration`; bila isinya berbeda dengan file ini, panduan itulah yang benar. Di Linux, `orca` di luar terminal Orca biasanya pembaca layar GNOME, jadi pakai `orca-ide` (dijelaskan di panduan itu).
 
 ## Kapan dipakai
 - **Sepadan** bila executor memakai lebih dari satu model atau tool, dan head yang memilih model per task. User tidak perlu membuka sesi executor dan mengetik prompt pembuka untuk setiap task. Waktu user mahal, sedangkan peluncuran oleh head bisa diperiksa dari receipt-nya.
@@ -29,22 +29,27 @@ Contoh baris (T3 §Profil Executor):
 ## Setelan izin agen
 Orca menambahkan flag izin saat meluncurkan agen, menurut setelannya di **Settings → Agents**. Tabelnya ada di `references/enforcement.md` §Orca. Ringkasnya, `Full access` meluncurkan Claude Code dan Antigravity dengan `--dangerously-skip-permissions`. Antigravity lalu menyetujui semua permintaan izin, dan Claude Code hanya menyisakan aturan `ask`/`deny` project; selebihnya pagar pengaman executor tinggal teks. Untuk project yang punya operasi berisiko, pilih setelan lain bersama user sebelum dispatch pertama.
 
+Untuk Antigravity, hanya `Full access` yang mengubah perilakunya. Dengan setelannya sendiri, Antigravity CLI bisa meminta konfirmasi untuk setiap perintah, dan konfirmasi itu hanya terlihat di terminal worker (T1 butir **Konfirmasi dan dialog di terminal worker**). Pilihan untuk user: setelan sendiri dengan konfirmasi dijawab user atau head, atau `Full access` dengan task berisiko tidak lewat Orca.
+
+## Akun Claude worker
+`worker-start --agent claude` memakai login Claude Code bawaan Orca (`~/.claude`, atau akun Claude yang aktif di `orca account list`), bukan akun sesi head. User yang memakai beberapa akun lewat `CLAUDE_CONFIG_DIR` (mis. fungsi shell yang mengisinya sebelum menjalankan `claude`) akan mendapati worker berjalan di akun lain, bisa juga akun yang kuotanya sudah habis. Cara meluncurkan worker dengan akun sesi head ada di T1 (butir **Worker Claude Code memakai akun sesi head**): `orca terminal create` dengan perintah yang mengisi `CLAUDE_CONFIG_DIR`, tunggu TUI siap, lalu `worker-start --terminal`. Dicek jalan 2026-10-29 (Windows, PowerShell): transkrip worker tercatat di folder akun sesi head, mode izinnya `auto`, dan `worker_done` cocok dengan hasil ulang. Akun terkelola Orca (`orca account add`) tidak menggantikan cara ini, karena hanya ada satu akun Claude aktif per runtime untuk semua peluncuran.
+
 ## Sebelum task pertama (dicek jalan)
 1. `orca status --json`: runtime `ready`. `orca repo list --json` memuat root project. Bila belum, daftarkan dengan `orca repo add --path <root>`; folder tanpa git didaftarkan lewat `orca project setup-existing-folder`.
 2. Setelan izin agen dicek bersama user, lalu dicatat di Profil Executor (penanda D6) dan register keputusan.
 3. **Dispatch baca-saja**, satu untuk setiap agen yang akan dipakai. Spec-nya menjalankan `check_evidence.py` atas report terakhir dan `git status --porcelain`, tanpa mengubah file apa pun. Sesudah worker selesai:
    - isi `worker_done` cocok dengan hasil yang didapat head saat menjalankan ulang perintah yang sama;
    - `launch.effective` di receipt sama dengan yang diminta;
-   - mode izin terlihat di terminal worker (Claude Code menampilkannya di baris status);
+   - mode izin terlihat di terminal worker (Claude Code menampilkannya di baris status), termasuk apakah agen meminta konfirmasi untuk perintah biasa;
    - worker dilepas dengan `orca orchestration worker-release --dispatch <id> --json`.
 4. Bila ada yang tidak sesuai, catat bentuk yang jalan, sesuai aturan perintah dicek jalan (Pelajaran 24).
 
 ## Kalibrasi lewat Orca
 Model baru di tabel diuji kalibrasi dengan model dan effort yang akan dipakai (`references/low-capacity.md` §Uji Kalibrasi Model Baru). Lewat Orca:
 1. Dari root project, jalankan `python <folder skill>/scripts/calibrate.py create`. Skrip mencetak prompt kalibrasi.
-2. Isi `<nama model + effort persis>` di prompt itu dengan nama baris tabel. Tambahkan kalimat: "Setelah ketiga REPORT-K ditulis, kirim worker_done dengan outcome succeeded, juga bila K3 berstatus BLOCKED." Kirim hasilnya sebagai `--spec` di `worker-start`, dengan agen dan model baris itu.
+2. Isi `<nama model + effort persis>` di prompt itu dengan nama baris tabel. Tambahkan kalimat: "Setelah ketiga REPORT-K ditulis, kirim worker_done dengan outcome succeeded, juga bila K3 berstatus BLOCKED." Kirim hasilnya sebagai `--spec` di `worker-start`, dengan agen dan model baris itu. Worker Claude diluncurkan menurut T1 butir **Worker Claude Code memakai akun sesi head**.
 3. Selama kalibrasi, pertanyaan worker tentang isi task dijawab "ikuti task persis seperti tertulis". Jawaban yang memberi isi merusak uji.
-4. Sesudah `worker_done`, jalankan `calibrate.py grade`. Catat hasilnya di Riwayat kapasitas beserta `launch.effective`, lalu lepas worker.
+4. Sesudah `worker_done`, jalankan `calibrate.py grade`. Catat hasilnya di Riwayat kapasitas beserta bukti modelnya (`launch.effective`, atau header dan transkrip untuk worker di terminal sendiri), lalu lepas worker dan tutup terminal yang kamu buat.
 
 ## Batas
 - Orca tidak menggantikan bukti. `worker_done` hanya kabar; triase tetap memakai `check_evidence.py` dan verifikasi sesuai kapasitas.

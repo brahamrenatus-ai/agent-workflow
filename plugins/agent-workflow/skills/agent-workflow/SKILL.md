@@ -5,7 +5,7 @@ description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/p
 
 # Agent Workflow — Head + Executor untuk Project Apa Pun
 
-**Versi skill: 3.12.1.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
+**Versi skill: 3.13.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
 
 Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewat file di repo:
 - **Head** (perencana) menjaga arah, menganalisis hasil, memutuskan, mendesain, menulis task, dan memverifikasi.
@@ -166,7 +166,7 @@ handoff/
 - **Alat cek bukti.** Salin `scripts/check_evidence.py` dan `scripts/record.py` ke `handoff/tools/` untuk setiap project yang punya executor. Format bukti yang dicek ada di REPORT_TEMPLATE (T6). Executor menyimpan output bukti lewat `record.py` (asal log tercatat di `handoff/logs/provenance.jsonl`) dan menjalankan `check_evidence.py` sebelum DONE; head menjalankannya lagi saat triase. Kedua skrip ini juga tidak dihitung dalam batas 7 file.
 - **Perintah dicek jalan.** Setiap perintah yang ditulis ke protokol (build, test, alat di `handoff/tools/`, langkah penutup seperti `graphify update`) dijalankan sekali di mesin ini, dan yang ditulis adalah bentuk yang jalan. Perintah di file aturan agen buatan tool lain (mis. `.agents/rules/graphify.md`) ikut dicek; bila gagal, bentuk yang jalan ditambahkan sebagai catatan di file itu. Perintah yang tidak boleh dijalankan agen (flash, deploy, migrasi) ditandai `belum dicek`.
 - **Cek tampilan.** Project ber-UI: salin `scripts/screenshot.py` ke `handoff/tools/`, tulis perintahnya beserta ukuran layar sasaran di README §Lingkungan (T3, baris **Cek tampilan**), lalu jalankan sekali dan lihat hasilnya. Halaman yang butuh server (mis. `vite preview`) atau perangkat ditulis dengan langkah menyalakannya; layanan live diblokir dengan `--offline`. Jangan memotret lebar HP dengan `chrome --headless --window-size` biasa: Chrome desktop menata halaman minimal ±500 px lalu memotong fotonya. Tanpa Chrome, Chromium, atau Edge, jadikan Tugas User: cek di perangkat nyata (`user:`).
-- **Executor lewat Orca.** Bila head menjalankan executor lewat Orca, ikuti `references/orca.md`. Profil Executor mencatat peluncuran Orca per model, setelan izin agen dipilih bersama user (bukan `Full access` bila project punya operasi berisiko), dan satu dispatch baca-saja dijalankan sebelum task pertama. Tanpa Orca, bagian **Executor lewat Orca** (T1) dan **Dijalankan lewat Orca** (T2a/T2b) dihapus.
+- **Executor lewat Orca.** Bila head menjalankan executor lewat Orca, ikuti `references/orca.md`. Profil Executor mencatat peluncuran Orca per model, setelan izin agen dipilih bersama user (untuk project yang punya operasi berisiko, `Full access` hanya bila user menerima risikonya, dan task yang menyentuh operasi itu tidak lewat Orca), dan satu dispatch baca-saja dijalankan sebelum task pertama. Tanpa Orca, bagian **Executor lewat Orca** (T1) dan **Dijalankan lewat Orca** (T2a/T2b) dihapus.
 
 **Lokasi instruksi per tool**
 
@@ -328,7 +328,7 @@ Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rek
 ## Batasan Skill Ini
 - **Instruksi, bukan penegakan.** Untuk operasi kritis, tawarkan penegakan nyata (`references/enforcement.md`). Jangan mengubah setelan tanpa izin.
 - **Kemampuan model murah dan AI lokal sangat bervariasi.** Kalibrasi dulu, mulai dari task kecil, lalu naikkan setelah terbukti.
-- **Konvensi folder tiap tool dan standar struktur file berubah antar versi tool.** Cek dokumentasi tool bila ragu; label WAJIB harus bersumber dokumentasi versi yang dipakai project. Perintah Orca juga berubah: `references/orca.md` ditulis untuk Orca 1.4.243, dan panduan yang cocok dengan versi terpasang dicetak `orca skills get orchestration`.
+- **Konvensi folder tiap tool dan standar struktur file berubah antar versi tool.** Cek dokumentasi tool bila ragu; label WAJIB harus bersumber dokumentasi versi yang dipakai project. Perintah Orca juga berubah: `references/orca.md` ditulis untuk Orca 1.4.243 (dicek ulang dengan 1.4.244), dan panduan yang cocok dengan versi terpasang dicetak `orca skills get orchestration`.
 - **Hasil hanya sebaik bahannya.** Tanpa dokumen arah atau jawaban user, ROADMAP awal akan tipis. Tulis sebagai Pertanyaan Terbuka, jangan mengarang.
 - **Skill yang dihasilkan tidak memperbarui dirinya sendiri.** Jalankan mode AUDIT secara berkala, saat project terasa macet, atau saat skill ini naik versi. Jalur upgrade (§4) memasang aturan baru sebagai patch minimal.
 - **Untuk dipakai di tool lain**, lampirkan `SKILL.md` beserta folder `references/` dan `scripts/`.

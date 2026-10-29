@@ -31,7 +31,7 @@ Every rule comes from a failure seen in real projects, recorded in the skill's *
 
 Executor capacity has three levels (TINGGI/SEDANG/RENDAH, i.e. high/medium/low). Each level changes how tasks are written, how much design freedom the executor gets, and how deeply the head verifies. A new model can be placed with a 15-minute **calibration test** scored by a script.
 
-Capacity is tracked **per model**, so one project can use several executor models across tools (for example Gemini Flash in Antigravity for routine work, Claude in Claude Code for harder tasks). The head picks the model for each task: the cheapest one whose capacity is enough, following the user's preference order, and writes the reason in the task. With **Orca**, the head also launches that model itself (`orca orchestration worker-start`), waits for `worker_done`, and still triages the report from files; see `references/orca.md`.
+Capacity is tracked **per model**, so one project can use several executor models across tools (for example Gemini Flash in Antigravity for routine work, Claude in Claude Code for harder tasks). The head picks the model for each task: the cheapest one whose capacity is enough, following the user's preference order, and writes the reason in the task. With **Orca**, the head also launches that model itself (`orca orchestration worker-start`), waits for `worker_done`, and still triages the report from files; see `references/orca.md`. Tool-permission prompts and usage-limit dialogs only show in the worker terminal, so the head reads it between waits, and Claude workers run under the head session's own Claude account.
 
 ### Bundled scripts
 

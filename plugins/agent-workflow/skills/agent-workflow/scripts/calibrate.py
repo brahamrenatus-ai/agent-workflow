@@ -239,8 +239,8 @@ def buat(args):
     print("Prompt untuk user (tempel di sesi executor baru, dengan model dan effort yang akan dinilai):")
     print("  " + PROMPT.format(d=d.as_posix()))
     print()
-    print(f'Setelah executor selesai: python "{Path(__file__).resolve()}" nilai{opsi_dir}'
-          f'   (seed dibaca dari file di atas; bila file itu hilang: nilai --seed {seed}{opsi_dir})')
+    print(f'Setelah executor selesai: python "{Path(__file__).resolve()}" grade{opsi_dir}'
+          f'   (seed dibaca dari file di atas; bila file itu hilang: grade --seed {seed}{opsi_dir})')
     print("Bila perintah python di mesin executor bernama lain (mis. python3 atau py), sesuaikan TASK-K1.md sebelum mulai.")
     return 0
 
