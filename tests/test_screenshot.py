@@ -1,7 +1,7 @@
-"""Uji scripts/foto_tampilan.py (v3.10.1): lebar layar benar-benar emulasi (bukan jendela Chrome minimal ±500 px yang
+"""Uji scripts/screenshot.py (v3.10.1): lebar layar benar-benar emulasi (bukan jendela Chrome minimal ±500 px yang
 dipotong), tangkapan layar berukuran sesuai, dan ukuran halaman/elemen yang keluar layar bisa dinilai skrip.
 Dilewati bila Chrome/Chromium/Edge tidak ada di mesin ini.
-Pemakaian: python -X utf8 tests/test_foto_tampilan.py <folder skill>"""
+Pemakaian: python -X utf8 tests/test_screenshot.py <folder skill>"""
 import importlib.util
 import shutil
 import struct
@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 SKILL = Path(sys.argv[1]).resolve()
-SKRIP = SKILL / "scripts" / "foto_tampilan.py"
+SKRIP = SKILL / "scripts" / "screenshot.py"
 ok = True
 
 
@@ -24,11 +24,11 @@ def cek(cond, msg, out=""):
 
 
 if not SKRIP.is_file():
-    print("LEWAT uji foto_tampilan: skrip belum ada di versi ini")
+    print("LEWAT uji screenshot: skrip belum ada di versi ini")
     print("\nHASIL: SEMUA OK")
     sys.exit(0)
 sys.dont_write_bytecode = True  # jangan meninggalkan __pycache__ di folder skill
-spec = importlib.util.spec_from_file_location("foto_tampilan", SKRIP)
+spec = importlib.util.spec_from_file_location("screenshot", SKRIP)
 modul = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(modul)
 if hasattr(modul, "baca_port"):  # v3.10.2: file DevToolsActivePort dibaca hanya bila lengkap dan tidak dikunci
@@ -52,8 +52,17 @@ if hasattr(modul, "baca_port"):  # v3.10.2: file DevToolsActivePort dibaca hanya
                 fh.close()
     finally:
         shutil.rmtree(d_port, ignore_errors=True)
+if "--sizes" in SKRIP.read_text(encoding="utf-8"):  # v3.12: nama opsi berbahasa Inggris, nama lama tetap diterima
+    # Tanpa browser: halaman yang tidak ada ditolak sesudah argumen dibaca, jadi opsi yang tidak dikenal terlihat dari pesannya.
+    r = subprocess.run([sys.executable, "-X", "utf8", str(SKRIP), "tidak-ada.html", "x", "--ukuran", "375x812", "--luring",
+                        "--tunggu", "10"], capture_output=True, text=True, encoding="utf-8")
+    cek(r.returncode == 2 and "bukan URL dan bukan file" in r.stderr, "opsi lama --ukuran, --luring, --tunggu diterima", r.stderr)
+    bantuan = subprocess.run([sys.executable, "-X", "utf8", str(SKRIP), "--help"], capture_output=True, text=True,
+                             encoding="utf-8").stdout
+    cek("--sizes" in bantuan and "page" in bantuan and not any(o in bantuan for o in ("--ukuran", "--luring", "--tunggu")),
+        "--help hanya menampilkan nama opsi baru", bantuan)
 if not modul.cari_browser():
-    print("LEWAT uji foto_tampilan selebihnya: Chrome, Chromium, atau Edge tidak ada di mesin ini")
+    print("LEWAT uji screenshot selebihnya: Chrome, Chromium, atau Edge tidak ada di mesin ini")
     print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")
     sys.exit(0 if ok else 1)
 
@@ -86,32 +95,32 @@ tmp = Path(tempfile.mkdtemp(prefix="uji_foto_"))
 try:
     for nama, isi in HALAMAN.items():
         (tmp / nama).write_text(isi, encoding="utf-8")
-    rc, out = jalan(tmp / "jebakan.html", tmp / "out/jebakan", "--ukuran", "375x812", "1366x768", "--tunggu", "300")
+    rc, out = jalan(tmp / "jebakan.html", tmp / "out/jebakan", "--sizes", "375x812", "1366x768", "--wait", "300")
     cek(rc == 0 and "layar 375 px, halaman 375 px" in out and "elemen keluar layar: 0" in out,
         "lebar 375 px diemulasikan sungguhan: tombol yang membungkus tidak dilaporkan keluar layar", out)
     cek(ukuran_png(tmp / "out/jebakan-375x812.png") == (375, 812) and ukuran_png(tmp / "out/jebakan-1366x768.png") == (1366, 768),
         "tangkapan layar berukuran persis 375x812 dan 1366x768", out)
-    rc, out = jalan(tmp / "lebar.html", tmp / "out/lebar", "--ukuran", "375x812", "--tunggu", "300")
+    rc, out = jalan(tmp / "lebar.html", tmp / "out/lebar", "--sizes", "375x812", "--wait", "300")
     cek(rc == 1 and "layar 375 px, halaman 600 px (lebih lebar dari layar" in out and "div#kotak" in out,
         "elemen 600 px di layar 375 px: halaman lebih lebar dari layar dan elemennya disebut, exit 1", out)
-    rc, out = jalan(tmp / "gulir.html", tmp / "out/gulir", "--ukuran", "375x812", "--tunggu", "300")
+    rc, out = jalan(tmp / "gulir.html", tmp / "out/gulir", "--sizes", "375x812", "--wait", "300")
     cek(rc == 0 and "halaman 375 px" in out and "elemen keluar layar: 0" in out,
         "isi di dalam wadah bergulir (overflow-x: auto) tidak dihitung keluar layar", out)
-    rc, out = jalan(tmp / "potong.html", tmp / "out/potong", "--ukuran", "375x812", "--tunggu", "300")
+    rc, out = jalan(tmp / "potong.html", tmp / "out/potong", "--sizes", "375x812", "--wait", "300")
     cek(rc == 1 and "div#lebar-terpotong" in out,
         "halaman yang menyembunyikan gulir (body overflow-x: hidden) tetap ketahuan memotong elemen", out)
     if "def buka_halaman" in SKRIP.read_text(encoding="utf-8"):  # v3.10.2
         url_hash = (tmp / "jebakan.html").resolve().as_uri() + "#/hari-ini"
-        rc, out = jalan(url_hash, tmp / "out/hash", "--ukuran", "375x812", "1366x768", "--tunggu", "300")
+        rc, out = jalan(url_hash, tmp / "out/hash", "--sizes", "375x812", "1366x768", "--wait", "300")
         cek(rc == 0 and out.count("elemen keluar layar: 0") == 2 and (tmp / "out/hash-1366x768.png").is_file(),
             "URL dengan rute hash (#/...) di dua ukuran: ukuran kedua juga termuat (lewat about:blank)", out)
     else:
-        print("LEWAT uji rute hash: foto_tampilan.py versi lama")
-    rc, out = jalan(tmp / "jebakan.html", tmp / "out/luring", "--ukuran", "375x812", "--luring", "--tunggu", "300")
-    cek(rc == 0 and "layar 375 px" in out, "--luring: halaman lokal tetap termuat", out)
+        print("LEWAT uji rute hash: screenshot.py versi lama")
+    rc, out = jalan(tmp / "jebakan.html", tmp / "out/luring", "--sizes", "375x812", "--offline", "--wait", "300")
+    cek(rc == 0 and "layar 375 px" in out, "--offline: halaman lokal tetap termuat", out)
     rc, out = jalan(tmp / "tidak-ada.html", tmp / "out/x")
     cek(rc == 2 and "bukan URL dan bukan file" in out, "file yang tidak ada: exit 2", out)
-    rc, out = jalan(tmp / "jebakan.html", tmp / "out/x", "--ukuran", "375kali812")
+    rc, out = jalan(tmp / "jebakan.html", tmp / "out/x", "--sizes", "375kali812")
     cek(rc == 2 and "WxH" in out, "ukuran salah format: exit 2", out)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)

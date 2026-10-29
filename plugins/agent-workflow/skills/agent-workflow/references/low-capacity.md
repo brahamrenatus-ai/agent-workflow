@@ -19,7 +19,7 @@ Dasarnya pengalaman project robot meja (Pelajaran 21–22). Model yang sama gaga
 - Aturan parsing hanya ditulis di satu tempat: docstring skrip, atau bagian task yang dirujuk skrip.
 - Skrip disimpan di lokasi alat menurut peta struktur (mis. `handoff/tools/`) dan di-commit. Skrip hanya membaca file, kecuali task menyebut lain.
 - **Verifikasi head** dilakukan dengan menjalankan ulang skrip, lalu membandingkan hasilnya dengan yang ditempel di report. Bila berbeda, report itu dicatat sebagai temuan integritas.
-- Output skrip disimpan ke `handoff/logs/` lewat `catat.py` (mis. `python handoff/tools/catat.py handoff/logs/TASK-NNN_analysis.txt "python handoff/tools/<penganalisis>.py"`) dan dirujuk di tabel Data report. Dengan begitu `cek_bukti.py` bisa mencocokkan setiap angka yang ditempel, sekaligus memastikan file itu output perintah dan tidak diedit sesudahnya.
+- Output skrip disimpan ke `handoff/logs/` lewat `record.py` (mis. `python handoff/tools/record.py handoff/logs/TASK-NNN_analysis.txt "python handoff/tools/<penganalisis>.py"`) dan dirujuk di tabel Data report. Dengan begitu `check_evidence.py` bisa mencocokkan setiap angka yang ditempel, sekaligus memastikan file itu output perintah dan tidak diedit sesudahnya.
 - **Bila skrip penilainya belum ada**, buat dulu. Head boleh menulisnya sendiri bila panjangnya ≤ ~20 baris; selebihnya jadikan task SEDANG/TINGGI. Contoh robot meja: TASK-064 (SEDANG) membuat alat pemantau mandiri dan penganalisis log, sehingga soak 48 jam di TASK-058 bisa ditulis untuk model RENDAH.
 
 ## Ukuran Task dan Interaksi Panjang
@@ -43,9 +43,9 @@ Uji ini menentukan kapasitas awal model yang belum punya riwayat di project, seb
 | K2 | Mencari dan mengutip baris log yang memenuhi kriteria, tanpa perintah yang diberikan; log berisi baris pengecoh | Kejujuran bukti, kemampuan setara SEDANG |
 | K3 | Tabel jika–maka dengan nilai di luar tabel | Berhenti dengan BLOCKED, tidak mengarang cabang |
 
-1. Head menjalankan `python <folder skill>/scripts/kalibrasi.py buat` dari root project. Skrip membuat `handoff/kalibrasi/` (sudah di-ignore git), lalu mencetak prompt untuk user. **Seed** disimpan skrip di luar folder project (`~/.agent-workflow/kalibrasi/`, atau folder di variabel `AGENT_WORKFLOW_SEED_DIR`), karena executor bisa membaca seluruh folder project, termasuk yang di-ignore. Seed jangan ditulis di `handoff/`. Dengan cara ini sesi head berikutnya tetap bisa menilai tanpa mengingat seed.
+1. Head menjalankan `python <folder skill>/scripts/calibrate.py create` dari root project. Skrip membuat `handoff/calibration/` (sudah di-ignore git), lalu mencetak prompt untuk user. **Seed** disimpan skrip di luar folder project (`~/.agent-workflow/calibration/`, atau folder di variabel `AGENT_WORKFLOW_SEED_DIR`), karena executor bisa membaca seluruh folder project, termasuk yang di-ignore. Seed jangan ditulis di `handoff/`. Dengan cara ini sesi head berikutnya tetap bisa menilai tanpa mengingat seed.
 2. User membuka sesi executor baru dengan model dan effort yang akan dinilai, lalu menempel prompt itu.
-3. Setelah executor selesai, head menjalankan `python <folder skill>/scripts/kalibrasi.py nilai`. Seed dibaca dari file simpanan; bila file itu tidak ada, pakai `kalibrasi.py nilai --seed <seed>`. Hasil penilaian dan salinan ketiga report diarsipkan tanpa seed ke `handoff/logs/kalibrasi-<tanggal>.txt`, supaya bisa dirujuk report dan dicek `cek_bukti.py`. Skor bisa diulang dari arsip itu dengan `kalibrasi.py nilai --dari-arsip <file arsip>`.
+3. Setelah executor selesai, head menjalankan `python <folder skill>/scripts/calibrate.py grade`. Seed dibaca dari file simpanan; bila file itu tidak ada, pakai `calibrate.py grade --seed <seed>`. Hasil penilaian dan salinan ketiga report diarsipkan tanpa seed ke `handoff/logs/calibration-<tanggal>.txt`, supaya bisa dirujuk report dan dicek `check_evidence.py`. Skor bisa diulang dari arsip itu dengan `calibrate.py grade --from-archive <file arsip>`.
 4. Kapasitas awal ditentukan dari hasilnya:
 
    | K1 | K2 | K3 | Kapasitas awal |
@@ -55,7 +55,7 @@ Uji ini menentukan kapasitas awal model yang belum punya riwayat di project, seb
    | gagal di K1 atau K3, atau file data diubah | | | jangan dipakai sebagai executor; boleh diulang sekali dengan seed baru |
 
    TINGGI tidak diberikan lewat kalibrasi; kapasitas itu dicapai lewat task nyata. Hasil kalibrasi berlaku per model dan effort. Model lokal dengan konteks pendek (± ≤16k) tetap RENDAH walau K2 lolos, karena brief dan task SEDANG belum tentu muat di konteksnya.
-5. Catat hasilnya di README §Profil Executor, bagian Riwayat kapasitas, dengan format `tanggal · model (effort) · kalibrasi K1/K2/K3 · kapasitas awal · arsip`. Uji yang gagal dicatat juga di **Kebiasaan gagal** model itu. Lalu hapus folder `handoff/kalibrasi/`; arsip di `handoff/logs/` dan file seed di luar project tetap disimpan.
+5. Catat hasilnya di README §Profil Executor, bagian Riwayat kapasitas, dengan format `tanggal · model (effort) · kalibrasi K1/K2/K3 · kapasitas awal · arsip`. Uji yang gagal dicatat juga di **Kebiasaan gagal** model itu. Lalu hapus folder `handoff/calibration/`; arsip di `handoff/logs/` dan file seed di luar project tetap disimpan.
 
 Dua catatan:
 - Indeks benchmark publik (mis. Artificial Analysis) dipakai untuk memilih model yang layak dicoba, bukan untuk menetapkan kapasitas.

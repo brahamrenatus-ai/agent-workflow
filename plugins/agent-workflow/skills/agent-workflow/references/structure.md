@@ -41,7 +41,7 @@ Selalu bandingkan dengan opsi "biarkan":
 - **Berkas yang berubah sendiri:** hook git yang aktif (`ls .git/hooks | grep -v sample`, `git config core.hooksPath`) dan tool yang menulis ulang file ter-track tanpa disentuh task (mis. hook `post-commit` graphify → `graphify-out/`). Catat di §Berubah Sendiri peta struktur (T9), supaya `git status` di Periksa Diri executor dan commit task tidak tersandung.
 - **File ter-track yang cocok dengan pola `.gitignore`:** `git ls-files -ci --exclude-standard`.
 - **File secret yang ter-track:** `.env`, `secrets.*` selain file contoh, `*.pem`, `*.key`. Sebut nama file saja, jangan nilainya.
-- **Nilai secret yang bocor ke file lain**, terutama log. Scan pola saja tidak cukup, karena token tanpa awalan khas akan lolos. Cari nilai asli dari file secret lokal tanpa mencetaknya dengan `python <folder skill>/scripts/cek_secret.py <folder...>` dari root project, atau `handoff/tools/cek_secret.py` bila sudah terpasang. `--list-sources` menunjukkan file secret yang terbaca.
+- **Nilai secret yang bocor ke file lain**, terutama log. Scan pola saja tidak cukup, karena token tanpa awalan khas akan lolos. Cari nilai asli dari file secret lokal tanpa mencetaknya dengan `python <folder skill>/scripts/check_secrets.py <folder...>` dari root project, atau `handoff/tools/check_secrets.py` bila sudah terpasang. `--list-sources` menunjukkan file secret yang terbaca.
 - **Path yang hanya berlaku di satu mesin** (`file:///`, `C:\Users\`, `/home/<nama>/`) di docs, rule, dan skrip. Path seperti ini rusak di mesin lain dan di sesi cloud; ganti dengan path relatif.
 - **Salinan file yang sama** di beberapa tempat (`git ls-files -z | xargs -0 sha1sum | sort | uniq -D -w40`), dan rujukan ke path yang tidak ada.
 - **Tanda struktur tumbuh liar:**
@@ -119,7 +119,7 @@ Sumber: [opsi direktori](https://docs.platformio.org/en/latest/projectconf/secti
 ## Log Bukti (`handoff/logs/`)
 Protokol ini menyimpan log sebagai bukti. Log yang di-commit bisa diperiksa dari mesin lain dan dari sesi cloud, yang hanya melihat file ter-commit. Git juga memadatkan teks, jadi log berukuran beberapa MB murah. Contoh dari robot meja: 23,2 MB log dalam 148 file, sementara seluruh `.git` beserta semua riwayatnya hanya 15 MB.
 - **Default: log yang dirujuk report di-commit utuh.**
-- **Cek secret dulu.** Firmware dan server sering mencetak token, password Wi-Fi, atau kunci saat debug. Sebelum commit, jalankan `cek_secret.py <file-log> --redact` (§Survei), yang mengganti temuan dengan `<REDACTED>`. Contoh dari robot meja: refresh token Spotify tercetak utuh di log uji, lalu ikut ter-commit dan ter-push.
+- **Cek secret dulu.** Firmware dan server sering mencetak token, password Wi-Fi, atau kunci saat debug. Sebelum commit, jalankan `check_secrets.py <file-log> --redact` (§Survei), yang mengganti temuan dengan `<REDACTED>`. Contoh dari robot meja: refresh token Spotify tercetak utuh di log uji, lalu ikut ter-commit dan ter-push.
 - **Log > ±10 MB:** log mentah disimpan di `handoff/logs/raw/` (di-ignore).
   - Yang di-commit adalah potongan di `handoff/logs/` yang memuat **semua baris yang dikutip report**, ditambah konteks secukupnya.
   - Baris pertama potongan menyebut path log mentah, jumlah barisnya, dan rentang waktunya.

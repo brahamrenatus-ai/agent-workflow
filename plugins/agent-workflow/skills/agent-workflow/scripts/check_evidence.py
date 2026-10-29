@@ -2,9 +2,9 @@
 """Pemeriksa bukti report agent-workflow: kutipan dan status OK dicocokkan dengan file log.
 
 Dijalankan dari root project (skrip ini disalin ke handoff/tools/ oleh BOOTSTRAP/AUDIT):
-  python handoff/tools/cek_bukti.py [--wajib-asal] handoff/reports/REPORT-NNN.md [report lain ...]
-  python handoff/tools/cek_bukti.py --pada <commit> handoff/reports/REPORT-NNN.md
-  python handoff/tools/cek_bukti.py --pada-report handoff/reports/REPORT-0*.md
+  python handoff/tools/check_evidence.py [--require-provenance] handoff/reports/REPORT-NNN.md [report lain ...]
+  python handoff/tools/check_evidence.py --at <commit> handoff/reports/REPORT-NNN.md
+  python handoff/tools/check_evidence.py --at-report handoff/reports/REPORT-0*.md
 
 Executor menjalankannya sebelum mengubah status task ke DONE; head menjalankannya lagi saat triase.
 
@@ -26,11 +26,11 @@ Yang dicek:
 3. Di blok kode lain: baris berformat log (diawali `[HH:MM:SS]` atau `[TAG]`), output `grep -n` atau
    Select-String (`file:baris:isi`), dan tabel `LineNumber Line` dari Select-String harus cocok dengan file.
    Baris log harus ada di file yang dirujuk report; bila hanya ada di file lain, skrip menyebut file itu.
-4. Asal log, bila handoff/logs/asal.jsonl ada (ditulis catat.py): log di handoff/logs/ yang dirujuk report harus
+4. Asal log, bila handoff/logs/provenance.jsonl ada (ditulis record.py): log di handoff/logs/ yang dirujuk report harus
    tercatat dengan hash yang sama. Log yang berubah setelah dicatat adalah masalah. Log tanpa catatan diberi
-   peringatan, atau masalah bila --wajib-asal dipakai. Log yang hanya muncul di baris output
+   peringatan, atau masalah bila --require-provenance dipakai. Log yang hanya muncul di baris output
    `git status --porcelain` (mis. di bagian Periksa Diri) bukan bukti, jadi asalnya tidak dicek. Log yang
-   disamarkan `cek_secret.py --redact` tetap cocok, karena skrip itu menambahkan catatan asal baru.
+   disamarkan `check_secrets.py --redact` tetap cocok, karena skrip itu menambahkan catatan asal baru.
 5. Kriteria task: bila kriteria terima di handoff/tasks/TASK-NNN-*.md bernomor K1, K2, ..., setiap nomor harus
    muncul di awal kolom Kriteria tabel Data report.
 Peringatan (tidak menggagalkan): klaim berhasil/lulus di luar tabel tanpa rujukan `file:baris`, status GAGAL
@@ -42,8 +42,8 @@ Rujukan `file:baris` boleh berupa path dari root repo, atau nama file saja bila 
 ada di handoff/logs/. Beberapa baris dari satu file: `file:12, 40, 41`, atau `file:12`, `:40` di sel yang sama.
 
 Report lama (AUDIT, survei): file kode dan dokumen bisa berubah sesudah report ditriase, sehingga kutipan yang dulu
-benar terbaca salah. `--pada <commit>` membaca semua file yang dirujuk (termasuk log, task, dan asal.jsonl) pada
-commit itu lewat git, tanpa mengubah working tree. `--pada-report` memakai commit terakhir yang mengubah tiap report;
+benar terbaca salah. `--at <commit>` membaca semua file yang dirujuk (termasuk log, task, dan provenance.jsonl) pada
+commit itu lewat git, tanpa mengubah working tree. `--at-report` memakai commit terakhir yang mengubah tiap report;
 report yang belum di-commit dicek terhadap working tree. Commit itu bisa juga memuat suntingan head saat triase,
 jadi bandingkan kedua mode: MASALAH yang muncul di keduanya adalah temuan, sedangkan yang hanya muncul di salah satu
 biasanya artefak perubahan file sesudah report ditulis.
@@ -80,7 +80,8 @@ ANGKA = re.compile(r"-?\d+(?:[.,]\d+)?")
 LOG_EXT = (".log", ".txt", ".csv", ".tsv", ".out", ".json", ".jsonl")  # baris kode boleh berubah sesudah dikutip
 EKSTENSI_SET = set(EKSTENSI.split("|"))
 ABAIKAN = {".git", ".pio", "node_modules", ".venv", "venv", "__pycache__", "build", "dist"}
-ASAL = Path("handoff") / "logs" / "asal.jsonl"
+ASAL = Path("handoff") / "logs" / "provenance.jsonl"
+ASAL_LAMA = Path("handoff") / "logs" / "asal.jsonl"  # nama sebelum v3.12
 BAGIAN_ANGKA = re.compile(r"ringkasan fakta|keputusan implementasi|anomali|fact summary|implementation decision|anomal(?:y|ies)", re.I)
 ANGKA_SATUAN = re.compile(r"(?<![\w.,/-])\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?\s*"
                           r"(?:ms|s|secs?|detik|menit|mins?|jam|hours?|%|MB|KB|GB|kg|°C|mA|V|Hz|dB|:1)(?![\w])", re.I)
@@ -129,13 +130,18 @@ def tanpa_spasi_sama(s):
 
 
 def hash_isi(isi):
-    """SHA-256 isi file (bytes) dengan CRLF disamakan menjadi LF (sama persis dengan catat.py)."""
+    """SHA-256 isi file (bytes) dengan CRLF disamakan menjadi LF (sama persis dengan record.py)."""
     return hashlib.sha256(isi.replace(b"\r\n", b"\n")).hexdigest()
 
 
+def asal_dipakai(berkas):
+    """Path relatif catatan asal: provenance.jsonl, atau asal.jsonl (nama sebelum v3.12) bila hanya itu yang ada."""
+    return ASAL_LAMA if not berkas.ada(berkas.root / ASAL) and berkas.ada(berkas.root / ASAL_LAMA) else ASAL
+
+
 def muat_asal(berkas):
-    """Catatan terakhir per file dari handoff/logs/asal.jsonl ({path relatif huruf kecil: catatan}); None bila tidak ada."""
-    p = berkas.root / ASAL
+    """Catatan terakhir per file dari handoff/logs/provenance.jsonl ({path relatif huruf kecil: catatan}); None bila tidak ada."""
+    p = berkas.root / asal_dipakai(berkas)
     if not berkas.ada(p):
         return None
     asal = {}
@@ -150,22 +156,23 @@ def muat_asal(berkas):
 
 
 def cek_asal(dirujuk, berkas, asal, wajib, hasil):
-    """Log di handoff/logs/ yang dirujuk report harus tercatat catat.py dengan hash yang sama."""
+    """Log di handoff/logs/ yang dirujuk report harus tercatat record.py dengan hash yang sama."""
     if asal is None:
         return
+    sumber = asal_dipakai(berkas).as_posix()
     for p in dirujuk:
         try:
             rel = p.resolve().relative_to(berkas.root.resolve()).as_posix()
         except ValueError:
             continue
-        if not rel.lower().startswith("handoff/logs/") or rel.lower() == ASAL.as_posix().lower():
+        if not rel.lower().startswith("handoff/logs/") or rel.lower() in (ASAL.as_posix().lower(), ASAL_LAMA.as_posix().lower()):
             continue
         rec = asal.get(rel.lower())
         if rec is None:
-            pesan = f"log {rel} tidak tercatat di {ASAL.as_posix()} (tidak dibuat lewat catat.py)"
+            pesan = f"log {rel} tidak tercatat di {sumber} (tidak dibuat lewat record.py)"
             (hasil.masalah if wajib else hasil.peringatan)(0, pesan)
         elif hash_isi(berkas.mentah(p)) != rec["sha256"]:
-            hasil.masalah(0, f"log {rel} berubah setelah dicatat catat.py (perintah: {rec.get('perintah', '?')}); "
+            hasil.masalah(0, f"log {rel} berubah setelah dicatat record.py (perintah: {rec.get('perintah', '?')}); "
                              "jalankan ulang perintahnya, jangan mengedit log")
         else:
             hasil.dicek += 1
@@ -233,7 +240,7 @@ def glob_rx(pola):
 class Berkas:
     """Isi file yang dirujuk report (di-cache), dengan pencarian nama file di handoff/logs/.
 
-    Tanpa `rev`, file dibaca dari working tree. Dengan `rev` (opsi --pada), semua file dibaca pada commit itu
+    Tanpa `rev`, file dibaca dari working tree. Dengan `rev` (opsi --at), semua file dibaca pada commit itu
     lewat `git ls-tree`/`git show`, sehingga kutipan report lama dicocokkan dengan isi file saat report ditulis."""
 
     def __init__(self, root, rev=None):
@@ -659,12 +666,13 @@ def baca_argumen(argv):
     opsi, reports, i = {"wajib_asal": False, "pada": None, "pada_report": False}, [], 0
     while i < len(argv):
         a = argv[i]
-        if a == "--wajib-asal":
+        # Nama opsi sebelum v3.12 (--wajib-asal, --pada-report, --pada) tetap diterima.
+        if a in ("--require-provenance", "--wajib-asal"):
             opsi["wajib_asal"] = True
-        elif a == "--pada-report":
+        elif a in ("--at-report", "--pada-report"):
             opsi["pada_report"] = True
-        elif a == "--pada" or a.startswith("--pada="):
-            if a == "--pada":
+        elif a in ("--at", "--pada") or a.startswith(("--at=", "--pada=")):
+            if "=" not in a:
                 i += 1
                 if i >= len(argv):
                     return None, []

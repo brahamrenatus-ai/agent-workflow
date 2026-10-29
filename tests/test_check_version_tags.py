@@ -1,7 +1,7 @@
-"""Uji cek_versi.py v3.10: penanda dikenali lewat tag <!-- aw: ID --> walau teks protokol bukan bahasa Indonesia,
-syarat @bila_ui, dan (sejak v3.11) syarat @bila_orca. Fixture dibuat dari template skill: setiap baris dibuang teksnya, hanya tag yang disisakan,
+"""Uji check_version.py v3.10: penanda dikenali lewat tag <!-- aw: ID --> walau teks protokol bukan bahasa Indonesia,
+syarat @bila_ui, (sejak v3.11) syarat @bila_orca, dan (sejak v3.12) penanda nama lama `tiada~`. Fixture dibuat dari template skill: setiap baris dibuang teksnya, hanya tag yang disisakan,
 lalu diberi teks pengisi berbahasa Inggris. Dengan begitu satu-satunya jalan penanda teks terpenuhi adalah tag.
-Pemakaian: python -X utf8 tests/test_cek_versi_tag.py <folder skill>"""
+Pemakaian: python -X utf8 tests/test_check_version_tags.py <folder skill>"""
 import re
 import shutil
 import subprocess
@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 SKILL = Path(sys.argv[1]).resolve()
-CEK = SKILL / "scripts" / "cek_versi.py"
+CEK = SKILL / "scripts" / "check_version.py"
 ok = True
 
 
@@ -23,7 +23,7 @@ def cek(cond, msg, out=""):
 
 
 if "def punya_tag" not in CEK.read_text(encoding="utf-8"):
-    print("LEWAT uji tag: cek_versi.py versi lama")
+    print("LEWAT uji tag: check_version.py versi lama")
     print("\nHASIL: SEMUA OK")
     sys.exit(0)
 
@@ -51,7 +51,7 @@ def buat(root, executor="T2a", dengan_tag=True, ui=True):
         "handoff/ROADMAP.md": hanya_tag("T4", dengan_tag),
         "handoff/NOTES.md": hanya_tag("T5", dengan_tag),
         "handoff/reports/REPORT_TEMPLATE.md": hanya_tag("T6", dengan_tag),
-        "handoff/STRUKTUR.md": hanya_tag("T9", dengan_tag),
+        "handoff/STRUCTURE.md": hanya_tag("T9", dengan_tag),
         "handoff/PROMPT_EXECUTOR.md": "Run the task.\n" + ("<!-- aw: M3 -->\n" if dengan_tag else ""),
         "handoff/README.md": ("# Handoff demo\n> Created with agent-workflow v3.10\n- **Head:** `.claude/skills/demo-head/SKILL.md` · tool: Claude Code\n"
                               "## Executor Profile\n- Tool: Claude Code\n" + hanya_tag("T3", dengan_tag)),
@@ -64,9 +64,9 @@ def buat(root, executor="T2a", dengan_tag=True, ui=True):
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(isi, encoding="utf-8")
-    for s in ("catat.py", "cek_bukti.py", "cek_secret.py", "foto_tampilan.py"):
+    for s in ("record.py", "check_evidence.py", "check_secrets.py", "screenshot.py"):
         (root / "handoff/tools").mkdir(parents=True, exist_ok=True)
-        if (SKILL / "scripts" / s).is_file():  # foto_tampilan.py ada sejak v3.10.1
+        if (SKILL / "scripts" / s).is_file():  # screenshot.py ada sejak v3.10.1
             shutil.copy(SKILL / "scripts" / s, root / "handoff/tools" / s)
     subprocess.run(["git", "init", "-q"], cwd=root, capture_output=True)
 
@@ -151,6 +151,19 @@ try:
         p.write_text(p.read_text(encoding="utf-8").replace("ORCA", "orcanet"), encoding="utf-8")
         rc, out = jalan(g)
         cek("| Orca: tidak ada" in out, "kata yang hanya memuat 'orca' (orcanet, orcas) tidak dihitung", out)
+    if "tiada~" in CEK.read_text(encoding="utf-8"):  # penanda nama lama ada sejak v3.12
+        n = tmp / "nama_lama"
+        buat(n)
+        for lama, baru in (("cek_bukti.py", "check_evidence.py"), ("catat.py", "record.py"),
+                           ("cek_secret.py", "check_secrets.py"), ("foto_tampilan.py", "screenshot.py")):
+            (n / "handoff/tools" / baru).rename(n / "handoff/tools" / lama)
+        (n / "handoff/STRUCTURE.md").rename(n / "handoff/STRUKTUR.md")
+        (n / "handoff/logs").mkdir(parents=True, exist_ok=True)
+        (n / "handoff/logs/asal.jsonl").write_text("", encoding="utf-8")
+        rc, out = jalan(n)
+        hilang = set(re.findall(r"^  - ([A-Z0-9-]+) \(", out, re.M))
+        cek(rc == 1 and hilang == {"N2", "N3", "N4", "N5", "N6", "N8"},
+            "project bernama lama: tepat N2–N6 dan N8 jadi kandidat; penanda versi lama tetap dikenali lewat nama lama", out)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")

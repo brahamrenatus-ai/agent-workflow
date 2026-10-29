@@ -2,8 +2,8 @@
 """Foto tampilan halaman web di beberapa ukuran layar, beserta ukuran yang bisa dinilai skrip.
 
 Dijalankan dari root project (skill agent-workflow menyalinnya ke handoff/tools/ untuk project ber-UI):
-  python handoff/tools/foto_tampilan.py <url atau file .html> handoff/logs/TASK-NNN-<layar>
-  python handoff/tools/foto_tampilan.py http://localhost:4173 handoff/logs/TASK-NNN-beranda --ukuran 375x812 1366x768 --luring
+  python handoff/tools/screenshot.py <url atau file .html> handoff/logs/TASK-NNN-<layar>
+  python handoff/tools/screenshot.py http://localhost:4173 handoff/logs/TASK-NNN-beranda --sizes 375x812 1366x768 --offline
 
 Untuk setiap ukuran, halaman dibuka di Chrome, Chromium, atau Edge headless dengan emulasi perangkat lewat
 DevTools Protocol. Lebar di bawah 768 px diemulasikan sebagai HP, sehingga `<meta name="viewport">` dihormati.
@@ -19,9 +19,10 @@ Mengapa tidak cukup `chrome --headless --window-size=375,812 --screenshot`: Chro
 HP muat, atau sebaliknya.
 
 Opsi:
-  --ukuran WxH ...   ukuran layar sasaran (bawaan: 375x812 1366x768)
-  --luring           blokir semua host selain localhost dan 127.0.0.1 (aman untuk halaman yang memanggil layanan live)
-  --tunggu MS        jeda sesudah halaman termuat, untuk render JavaScript (bawaan 1500)
+  --sizes WxH ...   ukuran layar sasaran (bawaan: 375x812 1366x768)
+  --offline         blokir semua host selain localhost dan 127.0.0.1 (aman untuk halaman yang memanggil layanan live)
+  --wait MS         jeda sesudah halaman termuat, untuk render JavaScript (bawaan 1500)
+Nama opsi sebelum v3.12 (--ukuran, --luring, --tunggu) tetap diterima.
 Browser dicari di variabel CHROME, lalu lokasi umum Chrome, Chromium, dan Edge.
 Exit code: 0 = semua ukuran tanpa elemen keluar layar, 1 = ada halaman lebih lebar dari layar atau elemen keluar
 layar, 2 = gagal (argumen salah, browser tidak ditemukan, halaman tidak termuat).
@@ -278,29 +279,34 @@ def foto(cdp, url, lebar, tinggi, tunggu_ms, keluar_png):
 def main():
     siapkan_output()
     ap = argparse.ArgumentParser(description="Foto tampilan halaman di beberapa ukuran layar dan ukur elemen yang keluar layar.")
-    ap.add_argument("halaman", help="URL (http://, https://, file://) atau path file .html")
+    ap.add_argument("halaman", metavar="page", help="URL (http://, https://, file://) atau path file .html")
     ap.add_argument("prefix", help="awalan file tangkapan layar, mis. handoff/logs/TASK-012-beranda")
-    ap.add_argument("--ukuran", nargs="+", default=["375x812", "1366x768"], help="ukuran layar WxH (bawaan: 375x812 1366x768)")
-    ap.add_argument("--luring", action="store_true", help="blokir semua host selain localhost dan 127.0.0.1")
-    ap.add_argument("--tunggu", type=int, default=1500, help="jeda sesudah halaman termuat, dalam ms (bawaan 1500)")
+    ap.add_argument("--sizes", dest="ukuran", nargs="+", default=["375x812", "1366x768"],
+                    help="ukuran layar WxH (bawaan: 375x812 1366x768)")
+    ap.add_argument("--offline", dest="luring", action="store_true", help="blokir semua host selain localhost dan 127.0.0.1")
+    ap.add_argument("--wait", dest="tunggu", type=int, default=1500, help="jeda sesudah halaman termuat, dalam ms (bawaan 1500)")
+    # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.
+    ap.add_argument("--ukuran", dest="ukuran", nargs="+", help=argparse.SUPPRESS)
+    ap.add_argument("--luring", dest="luring", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--tunggu", dest="tunggu", type=int, help=argparse.SUPPRESS)
     a = ap.parse_args()
     try:
         ukuran = [tuple(int(x) for x in u.lower().split("x")) for u in a.ukuran]
     except ValueError:
-        print(f"[foto] ukuran harus berbentuk WxH, mis. 375x812: {a.ukuran}", file=sys.stderr)
+        print(f"[screenshot] ukuran harus berbentuk WxH, mis. 375x812: {a.ukuran}", file=sys.stderr)
         return 2
     if "://" in a.halaman:
         url = a.halaman
     elif Path(a.halaman).is_file():
         url = Path(a.halaman).resolve().as_uri()
     else:
-        print(f"[foto] {a.halaman} bukan URL dan bukan file yang ada", file=sys.stderr)
+        print(f"[screenshot] {a.halaman} bukan URL dan bukan file yang ada", file=sys.stderr)
         return 2
     exe = cari_browser()
     if not exe:
-        print("[foto] Chrome, Chromium, atau Edge tidak ditemukan; isi variabel CHROME dengan path browser", file=sys.stderr)
+        print("[screenshot] Chrome, Chromium, atau Edge tidak ditemukan; isi variabel CHROME dengan path browser", file=sys.stderr)
         return 2
-    profil = tempfile.mkdtemp(prefix="foto_tampilan_")
+    profil = tempfile.mkdtemp(prefix="screenshot_")
     proses, ws = None, None
     ada_masalah = False
     try:
@@ -318,12 +324,12 @@ def main():
             if lebih:
                 catatan = (" (lebih lebar dari layar; HP menata halaman selebar isinya lalu memperkecilnya)"
                            if u["tata"] > lebar + 1 else " (lebih lebar dari layar; perlu gulir mendatar)")
-            print(f"[foto] {lebar}x{tinggi} ({jenis}): {png.as_posix()} | layar {lebar} px, halaman {u['halaman']} px"
+            print(f"[screenshot] {lebar}x{tinggi} ({jenis}): {png.as_posix()} | layar {lebar} px, halaman {u['halaman']} px"
                   f"{catatan} | elemen keluar layar: {u['jumlah']}")
             for e in u["keluar"]:
                 print(f"  - {e['elemen']} kiri={e['kiri']} kanan={e['kanan']}" + (f" \"{e['teks']}\"" if e["teks"] else ""))
     except (RuntimeError, ConnectionError, OSError, ValueError, KeyError) as e:
-        print(f"[foto] gagal: {e}", file=sys.stderr)
+        print(f"[screenshot] gagal: {e}", file=sys.stderr)
         return 2
     finally:
         if ws:

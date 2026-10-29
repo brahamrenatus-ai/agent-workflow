@@ -86,7 +86,7 @@ cek(bool(m2b) and m2b.group(1).count("\n") + 1 <= 80, f"T2b (brief executor REND
 pel = sk.split("## Pelajaran")[1].split("\n## ")[0] if "## Pelajaran" in sk else ""
 nomor = [int(n) for n in re.findall(r"^(\d+)\. \*\*", pel, re.M)]
 cek(bool(nomor) and nomor == list(range(1, len(nomor) + 1)), f"Pelajaran bernomor urut 1..{len(nomor)}")
-for n in sorted({int(n) for n in re.findall(r"Pelajaran (\d+)", sk + tp + baca("references/rendah.md"))}):
+for n in sorted({int(n) for n in re.findall(r"Pelajaran (\d+)", sk + tp + baca("references/low-capacity.md"))}):
     cek(n <= len(nomor), f"rujukan Pelajaran {n} ada")
 
 # Penanda changelog vs template dan tag
@@ -95,7 +95,7 @@ cek(len(ids) == len(set(ids)), "ID penanda unik")
 tabel = set(re.findall(r"^\|\s*([A-Z]\d*-?\d+)\s*\|", cl, re.M))
 cek(set(ids) <= tabel, f"setiap penanda punya baris tabel di changelog (kurang: {sorted(set(ids) - tabel)})")
 TAG = re.compile(r"<!--\s*aw:([^>]*?)-->")
-FILE_SEKSI = {"handoff/reports/REPORT_TEMPLATE.md": "T6", "handoff/STRUKTUR.md": "T9", "handoff/PROMPT_EXECUTOR.md": "T7",
+FILE_SEKSI = {"handoff/reports/REPORT_TEMPLATE.md": "T6", "handoff/STRUCTURE.md": "T9", "handoff/PROMPT_EXECUTOR.md": "T7",
               "handoff/README.md": "T3", "handoff/ROADMAP.md": "T4"}
 VARIAN = {"TINGGI/SEDANG": {"head": "T1", "executor": "T2a", "readme": "T3", "roadmap": "T4", "notes": "T5"},
           "RENDAH": {"head": "T1", "executor": "T2b", "readme": "T3", "roadmap": "T4", "notes": "T5"},
@@ -116,7 +116,7 @@ def nilai(spec, varian, pid):
     spec = spec.strip()
     if spec.startswith("tampak~"):
         return None
-    if spec.startswith("ada~"):
+    if spec.startswith(("ada~", "tiada~")):
         return None
     jenis, teks = spec.split("~", 1)
     if jenis.startswith("file:"):

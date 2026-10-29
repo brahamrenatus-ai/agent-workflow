@@ -1,4 +1,4 @@
-"""Uji scripts/cek_secret.py generik pada project palsu (semua rahasia di sini palsu). Argumen: path skrip."""
+"""Uji scripts/check_secrets.py generik pada project palsu (semua rahasia di sini palsu). Argumen: path skrip."""
 import shutil
 import subprocess
 import sys
@@ -110,8 +110,8 @@ try:
     tools = r1 / "handoff" / "tools"
     tools.mkdir(parents=True)
     t = SKRIP.read_text(encoding="utf-8").replace("SECRET_FILES = []", 'SECRET_FILES = ["include/secrets.h"]', 1)
-    (tools / "cek_secret.py").write_text(t, encoding="utf-8")
-    code, out = jalankan(r1, "--list-sources", skrip=tools / "cek_secret.py")
+    (tools / "check_secrets.py").write_text(t, encoding="utf-8")
+    code, out = jalankan(r1, "--list-sources", skrip=tools / "check_secrets.py")
     cek("T7 SECRET_FILES terpakai (bukan deteksi otomatis)", "dari SECRET_FILES" in out and "secrets.h: 3 nilai" in out, out)
 
     # ---------- T8 (v3.9.1): token bot Telegram, termasuk di URL Bot API yang dicatat httpx ----------

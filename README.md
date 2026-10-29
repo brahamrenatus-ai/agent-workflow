@@ -7,7 +7,7 @@ A Claude Code skill that sets up, audits, and upgrades a **two-agent development
 
 The two roles talk through files in the repo (`handoff/tasks`, `handoff/reports`, `NOTES`, `ROADMAP`), and the protocol is tuned to the **capacity of the executor model** instead of one size for all. The skill writes real files into your project (role instructions, protocol, roadmap, checks), not generic advice.
 
-> The skill text is written in **Indonesian**. Files it generates follow the language you use with the agent. Rule tags and tool keywords keep the bundled scripts working in any language (see [Language](#language)).
+> The skill text is written in **Indonesian**; file, script, and option names are English. Files it generates follow the language you use with the agent. Rule tags and tool keywords keep the bundled scripts working in any language (see [Language](#language)).
 
 ## Why
 
@@ -37,14 +37,14 @@ Capacity is tracked **per model**, so one project can use several executor model
 
 | Script | Copied into the project | Purpose |
 |---|---|---|
-| `catat.py` | yes (`handoff/tools/`) | Runs a command, saves its output byte-for-byte as an evidence log, and records provenance (command, exit code, SHA-256) in `handoff/logs/asal.jsonl`. `--hasil` registers files the command wrote (glob patterns allowed); logs of finished tasks are not overwritten without `--timpa`. |
-| `cek_bukti.py` | yes | Checks a report against its evidence: every `file:line` quote, every OK against its expected value, log provenance, and that each acceptance criterion has a row. `--pada <commit>` / `--pada-report` check old reports against the files as they were. Reads Indonesian or English reports. |
-| `cek_secret.py` | yes, if the project has local secret files | Finds secrets in files before commit by pattern and by the actual values from your local secret files, without printing them. `--staged`, `--redact`. |
-| `foto_tampilan.py` | yes, if the project has a web UI | Screenshots a page at target screen sizes using real device emulation through the Chrome DevTools Protocol, and reports the page width and any element that sticks out of the screen (exit 1 if so). `--luring` blocks every host except localhost. |
-| `cek_versi.py` | no (run from the skill folder) | Compares the project's protocol with the changelog markers, reports the effective version and the patches still missing. |
-| `kalibrasi.py` | no | Builds and scores the calibration test for a new executor model. |
+| `record.py` | yes (`handoff/tools/`) | Runs a command, saves its output byte-for-byte as an evidence log, and records provenance (command, exit code, SHA-256) in `handoff/logs/provenance.jsonl`. `--result` registers files the command wrote (glob patterns allowed); logs of finished tasks are not overwritten without `--overwrite`. |
+| `check_evidence.py` | yes | Checks a report against its evidence: every `file:line` quote, every OK against its expected value, log provenance, and that each acceptance criterion has a row. `--at <commit>` / `--at-report` check old reports against the files as they were. Reads Indonesian or English reports. |
+| `check_secrets.py` | yes, if the project has local secret files | Finds secrets in files before commit by pattern and by the actual values from your local secret files, without printing them. `--staged`, `--redact`. |
+| `screenshot.py` | yes, if the project has a web UI | Screenshots a page at target screen sizes using real device emulation through the Chrome DevTools Protocol, and reports the page width and any element that sticks out of the screen (exit 1 if so). `--offline` blocks every host except localhost. |
+| `check_version.py` | no (run from the skill folder) | Compares the project's protocol with the changelog markers, reports the effective version and the patches still missing. |
+| `calibrate.py` | no | Builds and scores the calibration test for a new executor model. |
 
-All scripts use only the Python standard library. `foto_tampilan.py` also needs Chrome, Chromium, or Edge.
+All scripts use only the Python standard library. `screenshot.py` also needs Chrome, Chromium, or Edge.
 
 > Why not `chrome --headless --window-size=375,812 --screenshot`? Desktop Chrome lays the page out at least ~500 px wide even when the window is narrower, then crops the picture. Buttons look cut off on "phone width" when they actually fit, or the other way round. This skill shipped that mistake once (see changelog v3.10.1).
 
@@ -67,14 +67,14 @@ Then ask in plain words ("set up a head/executor workflow for this project", "au
 
 ## Language
 
-The skill is written in Indonesian, and generated files follow your language. Two mechanisms keep the scripts language-independent:
+The skill is written in Indonesian, with English file, script, and option names (since v3.12; the scripts still accept the older Indonesian names). Generated files follow your language. Two mechanisms keep the scripts language-independent:
 
-- **Rule tags.** Every rule in the templates carries an HTML comment such as `<!-- aw: Z1 -->`. Tags are copied with the rule, invisible when rendered, and `cek_versi.py` recognises rules by their tag, so a protocol written in any language can still be upgraded.
+- **Rule tags.** Every rule in the templates carries an HTML comment such as `<!-- aw: Z1 -->`. Tags are copied with the rule, invisible when rendered, and `check_version.py` recognises rules by their tag, so a protocol written in any language can still be upgraded.
 - **Tool keywords.** Words the scripts parse (report headings, Data table columns, statuses) are written either in Indonesian or English, e.g. `Self-check`, `Expected`/`Observed`/`Evidence`, `PASS`/`FAIL`/`NOT TESTED`. The full table is in `references/templates.md` (*Kata kunci alat*).
 
 ## Versioning and upgrades
 
-The skill version is in `SKILL.md` and `references/changelog.md`. Each version lists the rules it adds to projects, with target file, patch method, and a marker. A generated `handoff/README.md` records the skill version it was built with. To upgrade a project, run the skill in AUDIT mode: it runs `cek_versi.py`, patches only the missing rules, keeps your own rules and local script patches, and asks before committing.
+The skill version is in `SKILL.md` and `references/changelog.md`. Each version lists the rules it adds to projects, with target file, patch method, and a marker. A generated `handoff/README.md` records the skill version it was built with. To upgrade a project, run the skill in AUDIT mode: it runs `check_version.py`, patches only the missing rules, keeps your own rules and local script patches, and asks before committing.
 
 ## Development
 

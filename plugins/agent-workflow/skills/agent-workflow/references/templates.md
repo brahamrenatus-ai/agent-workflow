@@ -6,16 +6,16 @@ Dibaca dari `SKILL.md` saat BOOTSTRAP/LITE, dan saat AUDIT/STRUKTUR bila butuh s
 - `{{PROJECT}}`, `{{prefix}}`, `{{RINGKASAN}}` (satu kalimat).
 - `{{BUILD}}`, `{{TEST}}`, `{{RUN}}` (diambil dari repo).
 - `{{LINGKUNGAN}}`: hardware/port, server, data uji (tanpa nilai rahasia).
-- `{{TOOL_EXECUTOR}}`, `{{MODEL_EXECUTOR}}`, `{{KAPASITAS}}`. Bila model executor tersebar di beberapa tool (mis. Antigravity dan Claude Code), baris `Tool:` di Profil Executor menyebut semuanya, karena `cek_versi.py` memeriksa folder skill setiap tool yang tertulis di sana.
-- `{{TOOL_HEAD}}`, `{{MODEL_HEAD}}`: tool dan model (+ effort) sesi head, mis. `Claude Code` dan `Claude Opus (high)`. Nama tool ditulis persis (`Claude Code`, `Antigravity`), karena `cek_versi.py` mencocokkannya dengan folder skill tool itu.
+- `{{TOOL_EXECUTOR}}`, `{{MODEL_EXECUTOR}}`, `{{KAPASITAS}}`. Bila model executor tersebar di beberapa tool (mis. Antigravity dan Claude Code), baris `Tool:` di Profil Executor menyebut semuanya, karena `check_version.py` memeriksa folder skill setiap tool yang tertulis di sana.
+- `{{TOOL_HEAD}}`, `{{MODEL_HEAD}}`: tool dan model (+ effort) sesi head, mis. `Claude Code` dan `Claude Opus (high)`. Nama tool ditulis persis (`Claude Code`, `Antigravity`), karena `check_version.py` mencocokkannya dengan folder skill tool itu.
 - `{{PATH_HEAD}}`, `{{PATH_EXECUTOR}}`: lokasi kanonis instruksi tiap peran.
 - `{{COMMIT}}`: konvensi commit.
 - `{{VERSI_SKILL}}`: versi skill ini (baris "Versi skill" di `SKILL.md`), mis. `3.10`.
-- `{{CEK_TAMPILAN}}`, `{{UKURAN_LAYAR}}` (hanya project ber-UI): perintah untuk melihat tampilan di mesin ini, biasanya `python handoff/tools/foto_tampilan.py <url atau file .html> handoff/logs/TASK-NNN-<layar> --ukuran 375x812 1366x768` (ditambah langkah menyalakan server bila perlu), dan ukuran layar sasaran, mis. `375×812 (HP)` dan `1366×768 (laptop)`.
+- `{{CEK_TAMPILAN}}`, `{{UKURAN_LAYAR}}` (hanya project ber-UI): perintah untuk melihat tampilan di mesin ini, biasanya `python handoff/tools/screenshot.py <url atau file .html> handoff/logs/TASK-NNN-<layar> --sizes 375x812 1366x768` (ditambah langkah menyalakan server bila perlu), dan ukuran layar sasaran, mis. `375×812 (HP)` dan `1366×768 (laptop)`.
 
-**Tag penanda.** Komentar `<!-- aw: ID -->` di template adalah penanda aturan untuk `cek_versi.py` (ID = baris di `references/changelog.md`). Salin tag apa adanya bersama aturannya, juga saat file ditulis dalam bahasa lain; yang diterjemahkan hanya teksnya. Tag tidak terlihat di tampilan Markdown. Aturan yang dihapus karena tidak relevan dihapus bersama tag-nya.
+**Tag penanda.** Komentar `<!-- aw: ID -->` di template adalah penanda aturan untuk `check_version.py` (ID = baris di `references/changelog.md`). Salin tag apa adanya bersama aturannya, juga saat file ditulis dalam bahasa lain; yang diterjemahkan hanya teksnya. Tag tidak terlihat di tampilan Markdown. Aturan yang dihapus karena tidak relevan dihapus bersama tag-nya.
 
-**Kata kunci alat.** Teks protokol mengikuti bahasa user, tetapi kata yang dibaca skrip ditulis persis dalam salah satu bentuk ini (`cek_bukti.py` mengenali keduanya):
+**Kata kunci alat.** Teks protokol mengikuti bahasa user, tetapi kata yang dibaca skrip ditulis persis dalam salah satu bentuk ini (`check_evidence.py` mengenali keduanya):
 
 | Dibaca | Bahasa Indonesia | Bahasa Inggris |
 |---|---|---|
@@ -38,7 +38,7 @@ Tidak diterjemahkan: status task `OPEN`/`IN_PROGRESS`/`DONE`/`BLOCKED` setelah `
 - T6 — `handoff/reports/REPORT_TEMPLATE.md`
 - T7 — Prompt Pembuka & Penunjuk
 - T8 — LITE
-- T9 — `handoff/STRUKTUR.md` (peta struktur)
+- T9 — `handoff/STRUCTURE.md` (peta struktur)
 - Penyesuaian per Jenis Project
 
 ### T1 — Instruksi Head (`<prefix>-head/SKILL.md`)
@@ -60,9 +60,9 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
    - List `handoff/tasks/`: nomor terakhir = terbesar; task BLOCKED ditangani dulu.
    - Report yang belum dianalisis.
 2. **Verifikasi & triase report:**
-   - **Integritas bukti.** Jalankan dulu `python handoff/tools/cek_bukti.py handoff/reports/REPORT-NNN.md`; setiap MASALAH yang dilaporkannya adalah temuan. Lalu cocokkan sisanya: setiap OK harus memenuhi nilai harapannya, dan setiap kutipan log harus ditemukan di file log yang dirujuk (grep). OK tanpa bukti yang cocok diubah menjadi GAGAL atau TIDAK DIUJI, dan dicatat sebagai temuan. Bagian Periksa Diri yang kosong, atau output test yang lebih lama dari perubahan terakhir, juga temuan. Peringatan "log tanpa catatan asal" berarti log itu tidak dibuat lewat `catat.py`; periksa asal isinya sebelum meloloskan OK yang merujuknya. <!-- aw: V3-1 P3 -->
+   - **Integritas bukti.** Jalankan dulu `python handoff/tools/check_evidence.py handoff/reports/REPORT-NNN.md`; setiap MASALAH yang dilaporkannya adalah temuan. Lalu cocokkan sisanya: setiap OK harus memenuhi nilai harapannya, dan setiap kutipan log harus ditemukan di file log yang dirujuk (grep). OK tanpa bukti yang cocok diubah menjadi GAGAL atau TIDAK DIUJI, dan dicatat sebagai temuan. Bagian Periksa Diri yang kosong, atau output test yang lebih lama dari perubahan terakhir, juga temuan. Peringatan "log tanpa catatan asal" berarti log itu tidak dibuat lewat `record.py`; periksa asal isinya sebelum meloloskan OK yang merujuknya. <!-- aw: V3-1 P3 N9 -->
    - **Bukti `user:`** dikonfirmasi ke user sebelum diloloskan. Kutipan yang hanya menyalin teks kriteria atau Harapan adalah OK palsu.
-   - **Task tampilan** (UI web, mobile, desktop): test yang lulus tidak membuktikan tampilan. Buka sendiri hasilnya di ukuran layar sasaran dengan alat di README §Lingkungan (**Cek tampilan**), simpan tangkapan layarnya di `handoff/logs/`, lalu bandingkan berdampingan dengan rancangan atau mockup yang dirujuk task. Pastikan alatnya benar-benar memakai lebar itu (`foto_tampilan.py` mencetaknya); foto `chrome --window-size` biasa di desktop ditata minimal ±500 px. Kriteria bertanda `head:` dinilai di sini. Selisih yang ditemukan menjadi koreksi, atau item backlog yang dicatat bila sengaja ditunda. <!-- aw: I1 -->
+   - **Task tampilan** (UI web, mobile, desktop): test yang lulus tidak membuktikan tampilan. Buka sendiri hasilnya di ukuran layar sasaran dengan alat di README §Lingkungan (**Cek tampilan**), simpan tangkapan layarnya di `handoff/logs/`, lalu bandingkan berdampingan dengan rancangan atau mockup yang dirujuk task. Pastikan alatnya benar-benar memakai lebar itu (`screenshot.py` mencetaknya); foto `chrome --window-size` biasa di desktop ditata minimal ±500 px. Kriteria bertanda `head:` dinilai di sini. Selisih yang ditemukan menjadi koreksi, atau item backlog yang dicatat bila sengaja ditunda. <!-- aw: I1 -->
    - **Kedalaman verifikasi** mengikuti kapasitas model yang mengerjakan (`Pelaksana (model)` di report). Report tanpa model, atau bertuliskan `tidak diketahui`: tanyakan ke user dulu, jangan menebak. <!-- aw: M4 -->
      - TINGGI → baca report dan cocokkan sampel.
      - SEDANG → cek diff, jalankan test, cocokkan semua OK.
@@ -72,8 +72,8 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
    - Hipotesis & Usulan masuk Kotak Usulan di ROADMAP (terima/tolak/parkir + alasan).
    - Klaim penyebab tanpa pembanding dicatat sebagai HIPOTESIS.
    - Kegagalan yang khas untuk satu model dicatat di README §Profil Executor, **Kebiasaan gagal** (model · kebiasaan · bukti · penangkal). OK palsu atau pelanggaran pagar pengaman menurunkan kapasitas satu tingkat; pelanggaran lain cukup dicatat sebagai Kebiasaan gagal, dan task itu tidak dihitung untuk naik (README §Profil Executor, **Syarat turun**).
-   - Nilai secret yang muncul di report atau log dihapus dan diganti nama/lokasinya. Periksa dengan `python handoff/tools/cek_secret.py handoff` (pola + nilai asli dari file secret lokal, tanpa mencetaknya).
-   - File baru dari executor harus berada di lokasi sesuai `handoff/STRUKTUR.md`. Yang tidak sesuai dipindah di task berikutnya, atau petanya diperbarui bila memang butuh tempat baru.
+   - Nilai secret yang muncul di report atau log dihapus dan diganti nama/lokasinya. Periksa dengan `python handoff/tools/check_secrets.py handoff` (pola + nilai asli dari file secret lokal, tanpa mencetaknya).
+   - File baru dari executor harus berada di lokasi sesuai `handoff/STRUCTURE.md`. Yang tidak sesuai dipindah di task berikutnya, atau petanya diperbarui bila memang butuh tempat baru.
    - **Tanda triase.** Setelah report diverifikasi, tulis `- Triase head: lolos <tanggal>` (atau `koreksi → TASK-NNN`) di file task-nya. Task yang berprasyarat task itu menunggu tanda ini, bukan status DONE dari executor. Task lama tanpa tanda yang dirujuk sebagai prasyarat diberi tanda saat kamu menulis task barunya. <!-- aw: D1 -->
    - **Sumber daya eksklusif.** Sebelum menjalankan perintah verifikasi, cek task `IN_PROGRESS` yang header `Memakai:`-nya menyebut sumber daya yang sama (port, perangkat, server uji). Selama dipakai, jalankan hanya pemeriksaan yang membaca file.
 3. **Gerbang arah** (sebelum membuat task): <!-- aw: B2 -->
@@ -87,13 +87,13 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
 4. **Tulis task** dengan format di `handoff/README.md` §Format Task, sesuai kapasitas:
    - RENDAH → atomik, dengan potongan kode, perintah persis, dan output yang diharapkan; maksimal ±8 langkah, cabang hanya dalam tabel jika–maka (maks. 3). Semua angka dan keputusan lolos/gagal dikeluarkan **skrip penilai** (test acceptance untuk FIX/FEATURE, penganalisis log untuk MEASURE/SMOKE). Jalankan skrip itu dulu pada data contoh dan ambil nilai harapan dari hasilnya. Penantian dan dialog panjang dipindah ke alat. <!-- aw: R1 R3 -->
    - SEDANG → sketsa desain, ditambah **test acceptance yang bisa dijalankan** untuk FIX/FEATURE (test, skrip, atau penganalisis log). Jalankan dulu sendiri supaya nilai harapannya benar. Bila hasilnya hanya bisa dinilai dengan mata user, tulis cara ceknya dan tandai `user:` di kriteria itu. Bila sketsa menyangkut perilaku yang sulit diduga (siklus hidup komponen, riwayat navigasi, konkurensi, urutan event), uji dulu sebagai implementasi rujukan di worktree terpisah sebelum menulis task; jebakan desain lebih murah ditemukan di sini daripada lewat satu siklus koreksi. <!-- aw: F1 F3 -->
-   - **Task tampilan:** kriteria tampilan ditulis bisa dicek: rujukan rancangan atau mockup (file + bagian), ukuran layar sasaran, dan apa yang harus terlihat. Yang terukur (ukuran elemen, posisi, tidak keluar layar, tanpa gulir mendatar) dinilai skrip audit peramban seperti test acceptance, mis. `foto_tampilan.py` exit 0: halaman tidak lebih lebar dari layar dan 0 elemen keluar layar. Yang butuh mata (kesesuaian dengan mockup) ditandai `head:` (kamu yang menilai saat triase) atau `user:`. <!-- aw: I1 -->
+   - **Task tampilan:** kriteria tampilan ditulis bisa dicek: rujukan rancangan atau mockup (file + bagian), ukuran layar sasaran, dan apa yang harus terlihat. Yang terukur (ukuran elemen, posisi, tidak keluar layar, tanpa gulir mendatar) dinilai skrip audit peramban seperti test acceptance, mis. `screenshot.py` exit 0: halaman tidak lebih lebar dari layar dan 0 elemen keluar layar. Yang butuh mata (kesesuaian dengan mockup) ditandai `head:` (kamu yang menilai saat triase) atau `user:`. <!-- aw: I1 -->
    - Task yang butuh desain bebas → `Butuh executor: TINGGI`.
    - **Pilihan model per task.** Pilih model dari README §Profil Executor: yang termurah dengan kapasitas cukup untuk `Butuh executor`, mengikuti **Urutan pilihan model** user, kecuali model itu punya Kebiasaan gagal yang mengenai task ini. Tulis model beserta alasannya di header task (`Model:`). Model yang kapasitasnya belum ditetapkan tidak menerima task sampai kapasitas awalnya ditetapkan, biasanya lewat uji kalibrasi skill agent-workflow. <!-- aw: M5 -->
    - **Bacaan luas didelegasikan.** Sebelum membaca kode, docs, atau log dalam jumlah besar untuk sebuah keputusan, tulis task FAKTA: pertanyaan yang jawabannya bisa ditunjuk dengan `file:baris` atau `hitung(lingkup, "pola")`. Baca tabel jawaban dan kutipannya, lalu buka file aslinya hanya untuk bagian yang menentukan keputusan. Untuk executor RENDAH, setiap pertanyaan disertai perintah pencarian persis.
-   - Rujukan kode ditulis sebagai fungsi + `file:baris`. Kriteria terima diberi nomor K1, K2, …, supaya `cek_bukti.py` bisa memeriksa bahwa setiap kriteria punya baris di tabel Data report.
+   - Rujukan kode ditulis sebagai fungsi + `file:baris`. Kriteria terima diberi nomor K1, K2, …, supaya `check_evidence.py` bisa memeriksa bahwa setiap kriteria punya baris di tabel Data report.
    - Prasyarat ditulis `TASK-NNN lolos triase head`. Task yang memegang port, perangkat, atau layanan bersama diberi header `Memakai: <sumber daya> (eksklusif, ±durasi)`.
-   - Untuk model yang punya **Kebiasaan gagal** tercatat, tulis penangkalnya di task (mis. "jalankan cek_bukti sebelum DONE", "jangan mengubah file X"). Satu task dikerjakan dalam satu sesi executor; task yang lebih panjang dipecah, atau penantiannya dipindah ke alat.
+   - Untuk model yang punya **Kebiasaan gagal** tercatat, tulis penangkalnya di task (mis. "jalankan check_evidence sebelum DONE", "jangan mengubah file X"). Satu task dikerjakan dalam satu sesi executor; task yang lebih panjang dipecah, atau penantiannya dipindah ke alat.
    - **Task yang kamu kerjakan sendiri** atas permintaan user: isi Pelaksana `sesi head · <model> (<effort>)`, tidak dihitung sebagai bukti kapasitas executor. Ambil model dan effort dari setelan sesi, bukan dari header task. Bila task itu pendek dan murah, sarankan user membukanya di sesi baru dengan model sesuai header, lalu cek model dan effort sesi itu begitu dibuka (README, baris **Sesi**). <!-- aw: E1 -->
    - Perbarui status di ROADMAP.
 5. **Perbarui konteks:**
@@ -101,13 +101,13 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
    - ROADMAP diperbarui.
    - Nilai secret tidak boleh ditulis di file mana pun di `handoff/`.
    - **Perintah baru** yang ditulis ke protokol atau task dijalankan sekali dulu di mesin ini, dan yang ditulis adalah bentuk yang jalan (mis. `python -m graphify`, bukan `graphify`). Perintah yang tidak boleh kamu jalankan (flash, deploy) ditandai `belum dicek`. <!-- aw: J2 -->
-   - **Isi commit.** Sebelum commit file handoff, periksa `git diff --cached --name-only`. Yang boleh ikut hanya file protokol (`handoff/`, file instruksi agen). Perubahan kode yang ikut ter-stage, termasuk sisa `git checkout` saat membandingkan versi, dikeluarkan dari stage dan dipulihkan, atau dijadikan commit terpisah berlabel kode beserta alasannya. Berkas di `handoff/STRUKTUR.md` §Berubah Sendiri juga tidak ikut commit task; commit terpisah atau biarkan. <!-- aw: G1 -->
-   - Sebelum commit, jalankan `python handoff/tools/cek_secret.py --staged`. Commit hanya bila bersih; bila ada temuan, samarkan dengan `--redact`, lalu `git add` ulang file itu, beserta `handoff/logs/asal.jsonl` bila skrip menambah catatan asal. <!-- aw: C2 -->
+   - **Isi commit.** Sebelum commit file handoff, periksa `git diff --cached --name-only`. Yang boleh ikut hanya file protokol (`handoff/`, file instruksi agen). Perubahan kode yang ikut ter-stage, termasuk sisa `git checkout` saat membandingkan versi, dikeluarkan dari stage dan dipulihkan, atau dijadikan commit terpisah berlabel kode beserta alasannya. Berkas di `handoff/STRUCTURE.md` §Berubah Sendiri juga tidak ikut commit task; commit terpisah atau biarkan. <!-- aw: G1 -->
+   - Sebelum commit, jalankan `python handoff/tools/check_secrets.py --staged`. Commit hanya bila bersih; bila ada temuan, samarkan dengan `--redact`, lalu `git add` ulang file itu, beserta `handoff/logs/provenance.jsonl` bila skrip menambah catatan asal. <!-- aw: C2 -->
    - Commit file handoff: {{COMMIT}}.
 6. **Retrospektif** tiap 5 task atau di akhir milestone:
    - ROADMAP vs kenyataan.
    - Drift antara docs/rules dan kode.
-   - Drift struktur terhadap `handoff/STRUKTUR.md`: folder baru di root, file besar yang tidak perlu ada di git, hasil generate atau secret yang ter-track. Temuannya masuk ROADMAP sebagai item STRUKTUR. <!-- aw: S5 -->
+   - Drift struktur terhadap `handoff/STRUCTURE.md`: folder baru di root, file besar yang tidak perlu ada di git, hasil generate atau secret yang ter-track. Temuannya masuk ROADMAP sebagai item STRUKTUR. <!-- aw: S5 -->
    - **Kapasitas executor**, per model: naik hanya dari task berformat kapasitas target (RENDAH → SEDANG: minimal 1 task berformat SEDANG), setelah 2 report berturut-turut bebas Kebiasaan gagal, lalu menjalani masa percobaan 2 task; turun satu tingkat hanya karena OK palsu atau pelanggaran pagar pengaman. Model baru tanpa riwayat diuji kalibrasi dulu. Bila kapasitas berubah, perbarui header `Butuh executor` di task OPEN.
    - Keputusan yang syarat buka-ulangnya sudah terpenuhi.
    - Rangkum NOTES.
@@ -148,7 +148,7 @@ Kamu paling dekat dengan kode dan lingkungan nyata. Kerjakan task dengan teliti,
 
 Kapasitasmu ditentukan model yang sedang dipakai (`handoff/README.md` §Profil Executor). Task bertanda `Butuh executor` di atas kapasitas modelmu → `BLOCKED`. Bila modelmu berkapasitas RENDAH, kerjakan semua jenis task secara literal: ambigu atau gagal 2× → `BLOCKED`, tanpa jalur ad-hoc, dan semua angka serta OK disalin dari output perintah atau skrip di task (jangan menghitung atau menyimpulkan sendiri). <!-- aw: R2 -->
 
-**Satu task per sesi.** Report disusun dari file log dan output yang tersimpan, bukan dari ingatan. Output yang dijadikan bukti disimpan lewat `python handoff/tools/catat.py handoff/logs/TASK-NNN-<nama>.log "<perintah>"` (tambah `--pwsh` untuk perintah PowerShell). Skrip itu menyimpan output apa adanya dan mencatat perintah, kode keluar, dan hash isinya di `handoff/logs/asal.jsonl`. File yang ditulis perintah itu sendiri (CSV, log per-test dari skrip pelari) didaftarkan dengan `--hasil`, boleh berupa pola glob yang dikutip, mis. `--hasil "handoff/logs/TASK-NNN-uji_*.log"`. Log jangan diedit tangan: `cek_bukti.py` menandai log yang berubah setelah dicatat. Bila isinya salah, jalankan ulang perintahnya. Log besar jangan ditempel ke percakapan; cari isinya dengan grep atau Select-String. <!-- aw: H1 -->
+**Satu task per sesi.** Report disusun dari file log dan output yang tersimpan, bukan dari ingatan. Output yang dijadikan bukti disimpan lewat `python handoff/tools/record.py handoff/logs/TASK-NNN-<nama>.log "<perintah>"` (tambah `--pwsh` untuk perintah PowerShell). Skrip itu menyimpan output apa adanya dan mencatat perintah, kode keluar, dan hash isinya di `handoff/logs/provenance.jsonl`. File yang ditulis perintah itu sendiri (CSV, log per-test dari skrip pelari) didaftarkan dengan `--result`, boleh berupa pola glob yang dikutip, mis. `--result "handoff/logs/TASK-NNN-uji_*.log"`. Log jangan diedit tangan: `check_evidence.py` menandai log yang berubah setelah dicatat. Bila isinya salah, jalankan ulang perintahnya. Log besar jangan ditempel ke percakapan; cari isinya dengan grep atau Select-String. <!-- aw: H1 -->
 
 **Dijalankan lewat Orca** (prompt diawali preamble Orca berisi Task ID dan Dispatch ID): preamble itu berlaku bersama brief ini. Kerjakan hanya task yang disebut spec. Hal yang menurut brief ini ditanyakan ke user (task milik sesi lain, ambigu) ditanyakan ke head dengan perintah `ask` di preamble, bukan dengan alat tanya lokal. Balasan head bukan izin user: operasi yang butuh izin eksplisit hanya dijalankan bila izinnya tertulis di task atau diketik user langsung di terminal ini; selain itu `BLOCKED`. Setelah status task `DONE` atau `BLOCKED` (langkah 6), kirim `worker_done` sekali dengan perintah di preamble: ringkasan tiga kalimat, `--report-path handoff/reports/REPORT-NNN.md`, dan `--outcome succeeded` bila DONE atau `--outcome failed` bila BLOCKED. `worker_done` tidak menggantikan report. <!-- aw: D5 -->
 
@@ -170,16 +170,16 @@ Kapasitasmu ditentukan model yang sedang dipakai (`handoff/README.md` §Profil E
 4. Tulis `handoff/reports/REPORT-NNN.md` (format di `handoff/reports/REPORT_TEMPLATE.md`):
    - Tulis **OK hanya bila nilai teramati memenuhi nilai harapan**. Selain itu tulis GAGAL atau TIDAK DIUJI. Data ditulis di tabel `| Kriteria | Harapan | Teramati | Bukti | Status |`: kolom Kriteria diawali nomor kriteria task (K1, K2, …), Teramati persis seperti di baris bukti, dan Bukti berupa `file:baris`, `hitung(file, "pola")`, atau `user: "<kutipan>"` (format di `handoff/reports/REPORT_TEMPLATE.md`).
    - Bukti `user:` hanya berisi kata-kata user yang benar-benar diucapkan di sesi ini. Bila user belum mencoba, tulis TIDAK DIUJI sampai user menjawab; jangan menyalin teks kriteria sebagai kutipan. <!-- aw: Y3 -->
-   - **Task tampilan:** simpan tangkapan layar setiap layar yang diubah di ukuran layar sasaran dengan perintah **Cek tampilan** di README §Lingkungan (`foto_tampilan.py`, prefix `handoff/logs/TASK-NNN-<layar>`), lalu sebut path-nya dan output ukurannya di report. Kriteria bertanda `head:` ditulis TIDAK DIUJI dengan path tangkapan layar di kolom Bukti, karena head yang menilainya. Jangan menulis "sesuai mockup" sebagai fakta. <!-- aw: I2 -->
+   - **Task tampilan:** simpan tangkapan layar setiap layar yang diubah di ukuran layar sasaran dengan perintah **Cek tampilan** di README §Lingkungan (`screenshot.py`, prefix `handoff/logs/TASK-NNN-<layar>`), lalu sebut path-nya dan output ukurannya di report. Kriteria bertanda `head:` ditulis TIDAK DIUJI dengan path tangkapan layar di kolom Bukti, karena head yang menilainya. Jangan menulis "sesuai mockup" sebagai fakta. <!-- aw: I2 -->
    - Angka di Ringkasan Fakta, Keputusan Implementasi, dan Anomali berasal dari output perintah atau file (rujuk `file:baris`). Perkiraan ditulis sebagai `HIPOTESIS:` atau perkiraan.
    - Isi `Pelaksana (model)` dengan nama model **persis** beserta effort-nya bila ada (mis. `<model> (high)`), dari baris `Model:` di prompt pembuka (dari user, atau dari spec head lewat Orca) atau dari pemilih model di tool. Bila tidak ada, tulis `tidak diketahui`. Jangan menebak dari pengetahuanmu sendiri, dan jangan menulis nama peran atau tool saja. <!-- aw: M2 E2 -->
-   - Kutipan log disalin dari file log yang disimpan di `handoff/logs/`; sebutkan path-nya. Sebelum commit, jalankan `python handoff/tools/cek_secret.py <file-log> --redact`. Skrip itu mengganti pola secret dan nilai dari file secret lokal dengan `<REDACTED>`, lalu mencatat penyamaran itu di `handoff/logs/asal.jsonl` untuk log dari `catat.py`, sehingga log tersebut tetap lolos `cek_bukti.py`. Log > ±10 MB disimpan sesuai aturan log di `handoff/STRUKTUR.md`. <!-- aw: C3 -->
+   - Kutipan log disalin dari file log yang disimpan di `handoff/logs/`; sebutkan path-nya. Sebelum commit, jalankan `python handoff/tools/check_secrets.py <file-log> --redact`. Skrip itu mengganti pola secret dan nilai dari file secret lokal dengan `<REDACTED>`, lalu mencatat penyamaran itu di `handoff/logs/provenance.jsonl` untuk log dari `record.py`, sehingga log tersebut tetap lolos `check_evidence.py`. Log > ±10 MB disimpan sesuai aturan log di `handoff/STRUCTURE.md`. <!-- aw: C3 -->
    - Sertakan fakta, keputusan implementasi, output perintah utama, dan **Hipotesis & Usulan** (label `HIPOTESIS:` / `USULAN:`).
 5. **Periksa diri sebelum DONE.** Langkah ini boleh memakan waktu dan token; ketelitian di sini lebih murah daripada satu siklus koreksi. <!-- aw: W1 -->
    - Baca ulang task dari awal. Setiap kriteria terima (K1, K2, …) harus punya baris di tabel Data, termasuk kriteria yang tidak dinilai skrip.
    - Jalankan ulang semua test acceptance dan perintah verifikasi pada kode akhir, lalu ganti output lama di report dengan output run ini.
-   - Jalankan `git status --porcelain`: yang berubah hanya file yang disebut task, report, log, dan berkas di `handoff/STRUKTUR.md` §Berubah Sendiri (berkas itu tidak ikut commit task). <!-- aw: O2 -->
-   - Jalankan `python handoff/tools/cek_bukti.py handoff/reports/REPORT-NNN.md` sampai 0 MASALAH. Perbaiki kutipannya, atau ubah status kriterianya menjadi GAGAL / TIDAK DIUJI (task FAKTA: TIDAK YAKIN). <!-- aw: P2 -->
+   - Jalankan `git status --porcelain`: yang berubah hanya file yang disebut task, report, log, dan berkas di `handoff/STRUCTURE.md` §Berubah Sendiri (berkas itu tidak ikut commit task). <!-- aw: O2 -->
+   - Jalankan `python handoff/tools/check_evidence.py handoff/reports/REPORT-NNN.md` sampai 0 MASALAH. Perbaiki kutipannya, atau ubah status kriterianya menjadi GAGAL / TIDAK DIUJI (task FAKTA: TIDAK YAKIN). <!-- aw: P2 N10 -->
    - Cocokkan setiap angka di Ringkasan Fakta dengan tabel Data.
 
    Bila ada yang salah, perbaiki lalu ulangi dari awal. Catat hasilnya di bagian Periksa Diri report.
@@ -192,7 +192,7 @@ Kapasitasmu ditentukan model yang sedang dipakai (`handoff/README.md` §Profil E
 | Edit kode dalam lingkup task | {{operasi berisiko nyata di project ini, satu per baris}} |
 | Menulis hipotesis berlabel | Commit/push di luar Langkah Penutup; klaim penyebab sebagai fakta |
 - Nilai secret (key, token, PIN, password) tidak ditulis di log, report, atau file mana pun di `handoff/`. <!-- aw: V3-3 -->
-- Letak file mengikuti `handoff/STRUKTUR.md`. Memindah, menghapus, atau mengganti nama file hanya bila task STRUKTUR memintanya. <!-- aw: S3 -->
+- Letak file mengikuti `handoff/STRUCTURE.md`. Memindah, menghapus, atau mengganti nama file hanya bila task STRUKTUR memintanya. <!-- aw: S3 -->
 - Penolakan hook/izin tidak diakali: catat di report, dan ubah status ke BLOCKED bila perlu.
 
 ## Perintah
@@ -216,7 +216,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
    Setiap task di `Prasyarat:` harus punya baris `Triase head: lolos`. Bila tidak ada → `Status: BLOCKED`, alasan "prasyarat belum diverifikasi head". <!-- aw: D3 -->
    Bila `Memakai:` menyebut sumber daya yang dipegang task lain berstatus `IN_PROGRESS` → `Status: BLOCKED`.
 2. Kerjakan langkahnya berurutan. Hanya ubah file yang disebut task, dan buat file baru hanya di lokasi yang disebut task.
-3. Jalankan setiap perintah verifikasi di task, lalu salin output-nya APA ADANYA ke report. Semua angka dan OK di report berasal dari output itu; jangan menghitung, meringkas, atau menyimpulkan sendiri. Test acceptance di task dijalankan persis seperti tertulis. Perintah yang hasilnya disimpan ke `handoff/logs/` dijalankan lewat `python handoff/tools/catat.py <log> "<perintah>"`, persis seperti di task. <!-- aw: R2 F2 -->
+3. Jalankan setiap perintah verifikasi di task, lalu salin output-nya APA ADANYA ke report. Semua angka dan OK di report berasal dari output itu; jangan menghitung, meringkas, atau menyimpulkan sendiri. Test acceptance di task dijalankan persis seperti tertulis. Perintah yang hasilnya disimpan ke `handoff/logs/` dijalankan lewat `python handoff/tools/record.py <log> "<perintah>"`, persis seperti di task. <!-- aw: R2 F2 -->
    Task FAKTA: jawab hanya dari output perintah di task. Jawaban DITEMUKAN dengan `file:baris`, TIDAK ADA dengan `hitung(lingkup, "pola")`; bila ragu, tulis TIDAK YAKIN. <!-- aw: L3 -->
    Kriteria bertanda `head:` ditulis TIDAK DIUJI, karena head yang menilainya. Tangkapan layar dibuat hanya dengan perintah yang tertulis di task. <!-- aw: I2 -->
 4. Berhenti jika output berbeda dari yang diharapkan, ada langkah yang tidak jelas, aturan task bertentangan dengan test acceptance, atau gagal 2 kali. Ubah ke `Status: BLOCKED` dan tulis apa yang terjadi.
@@ -227,10 +227,10 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
        File diubah:
        Output perintah (apa adanya; output yang disimpan ke file disebut path-nya):
        Bukti (blok kode berlabel bukti, satu per baris: file:baris | kutipan persis):
-       Periksa diri (output git status --porcelain, hasil cek_bukti):
+       Periksa diri (output git status --porcelain, hasil check_evidence):
        Masalah / pertanyaan:
        Usulan (opsional, satu-dua baris):
-6. **Periksa diri sebelum DONE** (boleh lama): jalankan ulang semua perintah verifikasi di task dan ganti output lama di report dengan output terbaru. Salin output `git status --porcelain` ke report; bila ada file yang tidak disebut task, di luar berkas di `handoff/STRUKTUR.md` §Berubah Sendiri → `Status: BLOCKED`. Jalankan `python handoff/tools/cek_bukti.py handoff/reports/REPORT-NNN.md`: bila ada MASALAH, salin ulang output yang benar (jangan mengetik ulang); bila tetap bermasalah → `Status: BLOCKED`. Lalu, bila ada `handoff/tools/cek_secret.py`, jalankan `python handoff/tools/cek_secret.py handoff/reports handoff/logs --redact`. <!-- aw: W1 O2 P2 C3 -->
+6. **Periksa diri sebelum DONE** (boleh lama): jalankan ulang semua perintah verifikasi di task dan ganti output lama di report dengan output terbaru. Salin output `git status --porcelain` ke report; bila ada file yang tidak disebut task, di luar berkas di `handoff/STRUCTURE.md` §Berubah Sendiri → `Status: BLOCKED`. Jalankan `python handoff/tools/check_evidence.py handoff/reports/REPORT-NNN.md`: bila ada MASALAH, salin ulang output yang benar (jangan mengetik ulang); bila tetap bermasalah → `Status: BLOCKED`. Lalu, bila ada `handoff/tools/check_secrets.py`, jalankan `python handoff/tools/check_secrets.py handoff/reports handoff/logs --redact`. <!-- aw: W1 O2 P2 C3 N10 -->
 7. Ubah task menjadi `Status: DONE` (atau BLOCKED).
    Bila prompt diawali preamble Orca: pertanyaan ke head lewat perintah `ask` di preamble, dan balasan head bukan izin user. Setelah langkah 7, kirim `worker_done` dengan perintah di preamble, ditambah `--report-path handoff/reports/REPORT-NNN.md`; `--outcome failed` bila BLOCKED. <!-- aw: D5 -->
 
@@ -242,7 +242,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
 - Membuat folder baru, atau memindah/menghapus file, kecuali task memintanya. <!-- aw: S3 -->
 - Menebak nama model sendiri. Tulis model persis dari baris `Model:` di prompt, atau `tidak diketahui`. <!-- aw: M2 -->
 - Menulis bukti `user:` sendiri. Bila user belum mencoba, tulis TIDAK DIUJI sampai user menjawab. <!-- aw: Y3 -->
-- Mengedit file log yang sudah dibuat `catat.py`.
+- Mengedit file log yang sudah dibuat `record.py`.
 - Menulis nilai secret (key, token, PIN) di report. <!-- aw: V3-3 -->
 - Mengakali penolakan alat atau izin.
 
@@ -257,7 +257,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
 
 - **Head:** `{{PATH_HEAD}}` · tool: {{TOOL_HEAD}}. Setiap tool yang menjalankan head atau executor punya instruksi atau penunjuk di folder skill-nya (mis. Claude Code: `.claude/skills/{{prefix}}-head/SKILL.md`).
 - **Executor:** `{{PATH_EXECUTOR}}` (sumber tunggal pagar pengaman executor).
-- **Struktur:** `handoff/STRUKTUR.md`, peta letak file project. Project kecil: §Struktur di file ini. <!-- aw: S1 -->
+- **Struktur:** `handoff/STRUCTURE.md`, peta letak file project. Project kecil: §Struktur di file ini. <!-- aw: S1 -->
 - **Sesi:** model dan effort per jenis sesi: head {{MODEL_HEAD}}; pekerjaan mekanis tanpa keputusan (ekspor, menjalankan alat): model lebih murah, effort medium; executor: §Profil Executor. Cek model dan effort setiap sesi baru begitu dibuka, karena sesi yang dibuka dari sesi lain bisa mewarisi setelan sesi asalnya. <!-- aw: N1 -->
 
 ## Profil Executor <!-- aw: B5 M1 -->
@@ -328,7 +328,7 @@ Status per item:
 Permintaan langsung user ke executor TINGGI/SEDANG → `TASK-NNN{B,C..}-<slug>.md` dengan header `Dibuat: executor atas permintaan user ("<kutipan>")`. Izin sebatas yang diminta. Executor RENDAH tidak memakai jalur ini.
 
 ## Format Report
-Format lengkap: `handoff/reports/REPORT_TEMPLATE.md`. Executor RENDAH memakai format singkat di brief-nya. Sebelum DONE, executor menjalankan `cek_bukti.py` atas report-nya; head menjalankannya lagi saat triase.
+Format lengkap: `handoff/reports/REPORT_TEMPLATE.md`. Executor RENDAH memakai format singkat di brief-nya. Sebelum DONE, executor menjalankan `check_evidence.py` atas report-nya; head menjalankannya lagi saat triase.
 
 ## Lingkungan
 Perintah di bagian ini sudah **dicek jalan** di mesin ini ({{tanggal}}). Perintah yang tidak boleh dijalankan agen (mis. flash, deploy) ditandai `belum dicek`. <!-- aw: J1 -->
@@ -336,10 +336,10 @@ Perintah di bagian ini sudah **dicek jalan** di mesin ini ({{tanggal}}). Perinta
 - Test: `{{TEST}}`
 - Run: `{{RUN}}`
 - {{LINGKUNGAN}}
-- Cek secret (bila `handoff/tools/cek_secret.py` ada): `python handoff/tools/cek_secret.py --staged` sebelum commit.
-- Simpan bukti: `python handoff/tools/catat.py handoff/logs/TASK-NNN-<nama>.log "<perintah>"` (asal log dicatat di `handoff/logs/asal.jsonl`). File yang ditulis perintah itu sendiri: `--hasil <file>` atau `--hasil "<pola glob>"`. Log task yang sudah DONE/BLOCKED tidak ditimpa tanpa `--timpa`.
-- Cek bukti: `python handoff/tools/cek_bukti.py handoff/reports/REPORT-NNN.md` sebelum DONE. Report lama: tambah `--pada-report`, supaya kutipan dicocokkan dengan isi file saat report di-commit. <!-- aw: P1 -->
-- Cek tampilan (project ber-UI): `{{CEK_TAMPILAN}}`, ukuran layar sasaran {{UKURAN_LAYAR}}. Alat `handoff/tools/foto_tampilan.py` mengemulasikan ukuran itu, menyimpan tangkapan layar di `handoff/logs/`, dan mencetak elemen yang keluar layar (exit 1 bila ada). `--luring` memblokir layanan live. <!-- aw: I3 -->
+- Cek secret (bila `handoff/tools/check_secrets.py` ada): `python handoff/tools/check_secrets.py --staged` sebelum commit.
+- Simpan bukti: `python handoff/tools/record.py handoff/logs/TASK-NNN-<nama>.log "<perintah>"` (asal log dicatat di `handoff/logs/provenance.jsonl`). File yang ditulis perintah itu sendiri: `--result <file>` atau `--result "<pola glob>"`. Log task yang sudah DONE/BLOCKED tidak ditimpa tanpa `--overwrite`.
+- Cek bukti: `python handoff/tools/check_evidence.py handoff/reports/REPORT-NNN.md` sebelum DONE. Report lama: tambah `--at-report`, supaya kutipan dicocokkan dengan isi file saat report di-commit. <!-- aw: P1 N11 -->
+- Cek tampilan (project ber-UI): `{{CEK_TAMPILAN}}`, ukuran layar sasaran {{UKURAN_LAYAR}}. Alat `handoff/tools/screenshot.py` mengemulasikan ukuran itu, menyimpan tangkapan layar di `handoff/logs/`, dan mencetak elemen yang keluar layar (exit 1 bila ada). `--offline` memblokir layanan live. <!-- aw: I3 -->
 
 ## Penomoran
 `NNN` berurutan. Report memakai nomor task-nya. Task ad-hoc = nomor terakhir + huruf.
@@ -409,14 +409,14 @@ Jenis: MEASURE / FIX / FEATURE / SPIKE / SMOKE / STRUKTUR / FAKTA. Status: BELUM
 (Status OK hanya bila nilai teramati memenuhi nilai harapan; selain itu GAGAL / TIDAK DIUJI. Kolom Kriteria diawali nomor kriteria task (K1, K2, …); satu kriteria boleh punya beberapa baris. Teramati ditulis persis seperti di baris bukti. Bukti berupa `file:baris` (beberapa baris: `file:3, 9`), `hitung(file, "pola")` untuk jumlah baris yang cocok (mis. 0 kemunculan crash), atau `user: "<kutipan>"`. Kutipan user adalah kata-kata user persis; bila user belum mencoba, status TIDAK DIUJI. Kriteria `head:` (dinilai head dari tangkapan layar) berstatus TIDAK DIUJI dengan path tangkapan layar di kolom Bukti. Harapan yang dinilai otomatis: `kunci=nilai`, `kunci<N`, `kunci>=N`, `=N`, digabung dengan "dan". Tanda `|` di dalam sel ditulis `\|`. RENDAH: tempel output skrip penilai/penganalisis apa adanya.)
 (Task FAKTA: kolom `| No | Pertanyaan | Jawaban | Bukti | Status |`, status DITEMUKAN / TIDAK ADA / TIDAK YAKIN. Lingkup `hitung` boleh file, folder, atau pola glob.)
 ## Bukti Mentah
-(Output yang dijadikan bukti disimpan dulu ke `handoff/logs/` lewat `python handoff/tools/catat.py <log> "<perintah>"`. Kutipan ditulis di blok berikut, satu per baris. Jalankan `python handoff/tools/cek_bukti.py` atas report ini sebelum DONE.)
+(Output yang dijadikan bukti disimpan dulu ke `handoff/logs/` lewat `python handoff/tools/record.py <log> "<perintah>"`. Kutipan ditulis di blok berikut, satu per baris. Jalankan `python handoff/tools/check_evidence.py` atas report ini sebelum DONE.)
 ```bukti
 handoff/logs/<file>.log:<baris> | <kutipan persis>
 ```
 ## Periksa Diri (sebelum DONE) <!-- aw: W2 -->
 - Test acceptance dan perintah verifikasi diulang pada kode akhir: <jam>; output di report berasal dari run ini.
 - `git status --porcelain` (apa adanya):
-- `cek_bukti.py` atas report ini: <N> masalah.
+- `check_evidence.py` atas report ini: <N> masalah.
 - Setiap kriteria terima di task (K1, K2, …) punya baris di tabel Data: ya / tidak (sebutkan).
 ## Keputusan Implementasi yang Diambil
 (FIX/FEATURE/SPIKE: pilihan, alasan, alternatif yang ditolak. MEASURE/SMOKE: "-".)
@@ -430,7 +430,7 @@ handoff/logs/<file>.log:<baris> | <kutipan persis>
 ### T7 — Prompt Pembuka & Penunjuk
 - `handoff/PROMPT_HEAD.md`: `Kamu adalah head agent {{PROJECT}}. Baca {{PATH_HEAD}}, lalu ikuti langkah-langkahnya.` Untuk executor, ganti peran dan path-nya, dan awali dengan nama model yang dipilih user: `handoff/PROMPT_EXECUTOR.md`: `Model: <nama model persis + effort di {{TOOL_EXECUTOR}}>. Kamu adalah executor {{PROJECT}}. Baca {{PATH_EXECUTOR}}, lalu kerjakan <TASK-NNN>.` File ini diakhiri tag `<!-- aw: M3 -->`. Bila head menjalankan executor lewat Orca, prompt yang sama menjadi `--spec` dispatch, dengan nama model dari baris Profil Executor yang dipilih head.
 - Penunjuk di tool kedua berisi frontmatter/judul yang sama, ditambah satu baris: `Baca dan ikuti {{PATH_...}}. File itu sumber tunggal instruksi peran ini.`
-- Rule atau `CLAUDE.md` (opsional, netral peran): `Head: {{PATH_HEAD}}. Executor: {{PATH_EXECUTOR}}. Di luar sesi head/executor, jangan mengedit handoff/NOTES.md atau handoff/ROADMAP.md kecuali diminta user. File baru mengikuti handoff/STRUKTUR.md.`
+- Rule atau `CLAUDE.md` (opsional, netral peran): `Head: {{PATH_HEAD}}. Executor: {{PATH_EXECUTOR}}. Di luar sesi head/executor, jangan mengedit handoff/NOTES.md atau handoff/ROADMAP.md kecuali diminta user. File baru mengikuti handoff/STRUCTURE.md.`
 
 ### T8 — `<prefix>-dev/SKILL.md` (LITE)
 ~~~markdown
@@ -445,15 +445,15 @@ description: "Mode pengembangan {{PROJECT}}: muat NOTES + ROADMAP, pilih pekerja
 2. Pilih item yang masuk fokus. Investigasi maksimal 3 sesi per pertanyaan; setiap 3 sesi harus ada minimal 1 FIX/FEATURE. Bila backlog fokus habis, tanyakan prioritas baru ke user. Untuk keputusan penting, terapkan **Mutu keputusan**: uji benar, perlu, terbaik untuk konteks (minimal dua opsi, termasuk "biarkan"), aman, dan bisa dikerjakan. <!-- aw: B2 V3-6 S4 -->
 3. Verifikasi status item di kode sebelum dikerjakan.
 4. Kerjakan item itu. Klaim penyebab hanya dengan pembanding; selain itu tulis sebagai HIPOTESIS. OK hanya bila nilai harapan terpenuhi. File baru mengikuti peta struktur di `NOTES.md` §1; pindah file hanya bertahap (satu kelompok, `git mv`, build ulang).
-5. Perbarui NOTES dan ROADMAP, tanpa nilai secret. Sebelum commit, jalankan `cek_secret.py --staged` bila terpasang. Untuk operasi berisiko ({{daftar}}), tanya user dulu. <!-- aw: C2 -->
+5. Perbarui NOTES dan ROADMAP, tanpa nilai secret. Sebelum commit, jalankan `check_secrets.py --staged` bila terpasang. Untuk operasi berisiko ({{daftar}}), tanya user dulu. <!-- aw: C2 -->
 6. Setiap ±5 sesi, jalankan SMOKE ({{alur}}) di lingkungan uji, lalu rapikan NOTES.
 ~~~
 
-### T9 — `handoff/STRUKTUR.md` (peta struktur)
-Diisi dari survei dan standar di `references/struktur.md` milik skill ini. Lokasinya:
-- Protokol lengkap → `handoff/STRUKTUR.md`. Penyimpangan masuk ROADMAP sebagai item STRUKTUR.
+### T9 — `handoff/STRUCTURE.md` (peta struktur)
+Diisi dari survei dan standar di `references/structure.md` milik skill ini. Lokasinya:
+- Protokol lengkap → `handoff/STRUCTURE.md`. Penyimpangan masuk ROADMAP sebagai item STRUKTUR.
 - Versi ringkas → bagian `## Struktur` di `handoff/README.md`, cukup Peta, Tidak Masuk Git, dan Berubah Sendiri bila ada (±15 baris). LITE → `NOTES.md` §1.
-- Mode STRUKTUR tanpa protokol → `docs/STRUKTUR.md`, dengan bagian Penyimpangan & Rencana. Bagian ini juga dipakai bila user belum mengizinkan ROADMAP diubah.
+- Mode STRUKTUR tanpa protokol → `docs/STRUCTURE.md`, dengan bagian Penyimpangan & Rencana. Bagian ini juga dipakai bila user belum mengizinkan ROADMAP diubah.
 ~~~markdown
 # Struktur {{PROJECT}}
 > Milik head. Executor mengikuti peta ini saat membuat file. Jenis project: {{JENIS}} (penanda: {{FILE_PENANDA}}). Standar dicek pada {{tanggal}}.
@@ -483,7 +483,7 @@ Berkas ter-track yang ditulis ulang hook atau tool tanpa disentuh task. Periksa 
 
 ## Aturan Letak File
 - File baru ditaruh sesuai Peta. Bila tidak ada tempat yang cocok, tulis USULAN di report; jangan membuat folder baru di root.
-- **Log bukti** yang dirujuk report di-commit utuh. Sebelum commit, jalankan `python handoff/tools/cek_secret.py <file-log> --redact` (file secret yang dicek: {{file secret}}).
+- **Log bukti** yang dirujuk report di-commit utuh. Sebelum commit, jalankan `python handoff/tools/check_secrets.py <file-log> --redact` (file secret yang dicek: {{file secret}}).
 - **Log > ±10 MB:** log mentah disimpan di `handoff/logs/raw/`. Yang di-commit di `handoff/logs/` adalah potongan yang memuat semua baris yang dikutip report. Baris pertamanya menyebut path log mentah, jumlah baris, dan rentang waktu. <!-- aw: S6 -->
 
 ## Prosedur Task STRUKTUR
@@ -508,6 +508,6 @@ Berkas ter-track yang ditulis ulang hook atau tool tanpa disentuh task. Periksa 
 | Data/ML | Eval run, ablation | Pipeline kecil end-to-end | Menimpa dataset, biaya GPU, data pribadi |
 | Library/CLI | Benchmark | Contoh README, test suite | Rilis paket, perubahan API yang tidak kompatibel |
 
-**Project ber-UI** (web, mobile, desktop): SMOKE memuat tangkapan layar layar utama di ukuran layar sasaran. Alat **Cek tampilan** di README §Lingkungan: untuk halaman web, `scripts/foto_tampilan.py` milik skill ini disalin ke `handoff/tools/` (emulasi perangkat lewat Chrome DevTools Protocol, tanpa dependensi selain Chrome, Chromium, atau Edge). Project yang sudah punya audit peramban sendiri (Playwright, Puppeteer, CDP) boleh tetap memakainya, asal lebar layarnya diemulasikan, bukan lebar jendela. UI non-web (aplikasi mobile native, layar perangkat) memakai emulator atau tangkapan layar perangkat; bila tidak ada, jadikan Tugas User: cek di perangkat nyata (`user:`).
+**Project ber-UI** (web, mobile, desktop): SMOKE memuat tangkapan layar layar utama di ukuran layar sasaran. Alat **Cek tampilan** di README §Lingkungan: untuk halaman web, `scripts/screenshot.py` milik skill ini disalin ke `handoff/tools/` (emulasi perangkat lewat Chrome DevTools Protocol, tanpa dependensi selain Chrome, Chromium, atau Edge). Project yang sudah punya audit peramban sendiri (Playwright, Puppeteer, CDP) boleh tetap memakainya, asal lebar layarnya diemulasikan, bukan lebar jendela. UI non-web (aplikasi mobile native, layar perangkat) memakai emulator atau tangkapan layar perangkat; bila tidak ada, jadikan Tugas User: cek di perangkat nyata (`user:`).
 
-Standar struktur file per jenis project ada di `references/struktur.md` milik skill ini.
+Standar struktur file per jenis project ada di `references/structure.md` milik skill ini.

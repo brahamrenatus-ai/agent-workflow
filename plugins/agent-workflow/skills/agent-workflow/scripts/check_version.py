@@ -2,7 +2,7 @@
 """Cek versi protokol agent-workflow di sebuah project.
 
 Dijalankan dari root project, langsung dari folder skill (skrip ini tidak disalin ke project):
-  python <folder skill>/scripts/cek_versi.py
+  python <folder skill>/scripts/check_version.py
 
 Skrip ini:
 - membaca penanda versi `agent-workflow vX` di handoff/README.md (atau skill <prefix>-dev untuk LITE);
@@ -14,6 +14,7 @@ Skrip ini:
 Penanda teks dianggap ada bila teksnya ditemukan, atau bila file sasarannya memuat tag `<!-- aw: ID -->` dengan ID
 penanda itu. Tag ikut tersalin dari template, jadi aturan tetap dikenali walau protokol ditulis dalam bahasa lain.
 
+Penanda `tiada~path` ada bila file itu tidak ada; dipakai untuk nama lama yang harus sudah diganti (v3.12).
 Penanda yang file sasarannya tidak ada (mis. instruksi executor di project LITE) dicatat "n/a", bukan "hilang".
 Penanda bersyarat juga "n/a" bila syaratnya tidak terpenuhi: `@bila_secret` (project punya file secret lokal),
 `@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop), dan `@bila_orca` (README handoff atau
@@ -171,6 +172,8 @@ def nilai_spec(root, spec, pid=""):
         return tampak(root, spec[7:].strip())[0]
     if spec.startswith("ada~"):
         return "ada" if (root / spec[4:].strip()).exists() else "hilang"
+    if spec.startswith("tiada~"):
+        return "hilang" if (root / spec[6:].strip()).exists() else "ada"
     if spec.startswith("file:"):
         path, teks = spec[5:].split("~", 1)
         p = root / path.strip()

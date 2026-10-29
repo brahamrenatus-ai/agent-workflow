@@ -1,7 +1,7 @@
-"""Uji penanda tampak~ di scripts/cek_versi.py (v3.8, K1/K2): instruksi head dan executor harus ada di folder skill
+"""Uji penanda tampak~ di scripts/check_version.py (v3.8, K1/K2): instruksi head dan executor harus ada di folder skill
 setiap tool yang tercatat di handoff/README.md. Kasus diambil dari project lapangan: robot meja (tool head tidak tercatat), aplikasi budidaya
 (executor Antigravity + cadangan Claude Code), dan IoT SCADA (head di dua tool).
-Pemakaian: python -X utf8 tests/test_cek_versi_tampak.py <folder skill>"""
+Pemakaian: python -X utf8 tests/test_check_version_visible.py <folder skill>"""
 import re
 import shutil
 import subprocess
@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 SKILL = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / ".claude/skills/agent-workflow").resolve()
-CV = SKILL / "scripts" / "cek_versi.py"
+CV = SKILL / "scripts" / "check_version.py"
 ok = True
 
 

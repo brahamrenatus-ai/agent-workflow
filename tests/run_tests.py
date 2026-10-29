@@ -17,14 +17,14 @@ T = Path(__file__).resolve().parent
 S = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else T.parent / "plugins/agent-workflow/skills/agent-workflow"
 UJI = [
     ("check_skill", [S]),
-    ("test_cek_versi_tag", [S]),
-    ("test_cek_versi_tampak", [S]),
-    ("test_cek_bukti", [S / "scripts" / "cek_bukti.py"]),
-    ("test_catat", [S]),
-    ("test_cek_secret", [S / "scripts" / "cek_secret.py"]),
-    ("test_redact_asal", [S]),
-    ("test_kalibrasi", [S]),
-    ("test_foto_tampilan", [S]),  # dilewati bila Chrome, Chromium, atau Edge tidak ada
+    ("test_check_version_tags", [S]),
+    ("test_check_version_visible", [S]),
+    ("test_check_evidence", [S / "scripts" / "check_evidence.py"]),
+    ("test_record", [S]),
+    ("test_check_secrets", [S / "scripts" / "check_secrets.py"]),
+    ("test_redact_provenance", [S]),
+    ("test_calibrate", [S]),
+    ("test_screenshot", [S]),  # dilewati bila Chrome, Chromium, atau Edge tidak ada
     ("test_orca_cli", [S]),  # dilewati bila Orca tidak terpasang
 ]
 gagal = []

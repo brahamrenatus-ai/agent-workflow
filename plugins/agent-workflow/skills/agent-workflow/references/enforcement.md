@@ -65,16 +65,16 @@ Orca menambahkan flag izin saat meluncurkan agen (`worker-start`, `agent launch`
 
 ## Git
 - **Hook pre-commit:** tolak commit bila file yang di-stage mengandung pola secret (kunci, token, PIN) atau mengubah file terlarang. Hook yang sama bisa menolak file > ±10 MB di luar daftar izin, file yang memuat nilai dari file secret lokal (dibandingkan tanpa dicetak), dan file yang cocok dengan pola Tidak Masuk Git di peta struktur.
-  Contoh paling sederhana memakai `handoff/tools/cek_secret.py`. Hook ini berlaku untuk semua tool yang meng-commit, termasuk executor:
+  Contoh paling sederhana memakai `handoff/tools/check_secrets.py`. Hook ini berlaku untuk semua tool yang meng-commit, termasuk executor:
   ```sh
   #!/bin/sh
   # .githooks/pre-commit
-  python handoff/tools/cek_secret.py --staged || { echo "Commit ditolak: ada secret. Samarkan dengan --redact, lalu git add ulang."; exit 1; }
+  python handoff/tools/check_secrets.py --staged || { echo "Commit ditolak: ada secret. Samarkan dengan --redact, lalu git add ulang."; exit 1; }
   for f in $(git diff --cached --name-only --diff-filter=AM -- 'handoff/reports/REPORT-*.md'); do
-    python handoff/tools/cek_bukti.py "$f" || { echo "Commit ditolak: bukti di $f belum cocok dengan log."; exit 1; }
+    python handoff/tools/check_evidence.py "$f" || { echo "Commit ditolak: bukti di $f belum cocok dengan log."; exit 1; }
   done
   ```
-  Baris `cek_bukti` membuat report baru atau yang diubah tidak bisa di-commit selama buktinya tidak cocok. Report lama yang tidak di-stage tidak ikut dicek.
+  Baris `check_evidence` membuat report baru atau yang diubah tidak bisa di-commit selama buktinya tidak cocok. Report lama yang tidak di-stage tidak ikut dicek.
 - **Hook commit-msg:** commit berlabel handoff hanya boleh berisi file protokol. Sesuaikan awalan pesan dengan konvensi project (mis. `handoff:` atau `docs(handoff):`):
   ```sh
   #!/bin/sh

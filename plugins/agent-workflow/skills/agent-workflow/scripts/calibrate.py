@@ -2,16 +2,19 @@
 """Uji kalibrasi model executor baru (agent-workflow).
 
 Dijalankan head dari root project, langsung dari folder skill (skrip ini tidak disalin ke project):
-  python <folder skill>/scripts/kalibrasi.py buat [--dir handoff/kalibrasi] [--seed N] [--ganti]
-  python <folder skill>/scripts/kalibrasi.py nilai [--seed N] [--dir handoff/kalibrasi] [--arsip FILE | --tanpa-arsip]
-  python <folder skill>/scripts/kalibrasi.py nilai --dari-arsip FILE [--seed N]
+  python <folder skill>/scripts/calibrate.py create [--dir handoff/calibration] [--seed N] [--replace]
+  python <folder skill>/scripts/calibrate.py grade [--seed N] [--dir handoff/calibration] [--archive FILE | --no-archive]
+  python <folder skill>/scripts/calibrate.py grade --from-archive FILE [--seed N]
 
-`buat` menulis tiga task mini beserta datanya, lalu mencetak seed dan prompt untuk user. Isi data
-diturunkan dari seed, sehingga `nilai` bisa menghitung ulang jawaban yang benar tanpa kunci di disk.
-Seed disimpan di luar folder project (~/.agent-workflow/kalibrasi/, atau folder di variabel
+`create` menulis tiga task mini beserta datanya, lalu mencetak seed dan prompt untuk user. Isi data
+diturunkan dari seed, sehingga `grade` bisa menghitung ulang jawaban yang benar tanpa kunci di disk.
+Seed disimpan di luar folder project (~/.agent-workflow/calibration/, atau folder di variabel
 AGENT_WORKFLOW_SEED_DIR), karena executor bisa membaca seluruh folder project; jangan ditulis di handoff/.
-`nilai` membaca seed itu bila --seed tidak diberikan, lalu mengarsipkan hasil dan ketiga report tanpa seed ke
-handoff/logs/kalibrasi-<tanggal>.txt. `nilai --dari-arsip` mengulang skor dari arsip itu.
+`grade` membaca seed itu bila --seed tidak diberikan, lalu mengarsipkan hasil dan ketiga report tanpa seed ke
+handoff/logs/calibration-<tanggal>.txt. `grade --from-archive` mengulang skor dari arsip itu.
+Nama sebelum v3.12 tetap diterima: subperintah `buat`/`nilai`, opsi `--ganti`, `--arsip`, `--tanpa-arsip`,
+`--dari-arsip`, pack lama di handoff/kalibrasi/ (bila handoff/calibration/ belum ada), dan seed lama di
+~/.agent-workflow/kalibrasi/.
 
 - K1: dua perintah persis, output ditempel apa adanya (kepatuhan literal).
 - K2: cari dan kutip baris log yang memenuhi kriteria, tanpa perintah yang diberikan; ada baris pengecoh.
@@ -30,7 +33,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-DIR_DEFAULT = "handoff/kalibrasi"
+DIR_DEFAULT = "handoff/calibration"
+DIR_LAMA = "handoff/kalibrasi"  # folder pack sebelum v3.12
+SUBPERINTAH_LAMA = {"buat": "create", "nilai": "grade"}  # nama sebelum v3.12
 ARSIP_DEFAULT = "handoff/logs"
 PEMISAH = "===== {} ====="
 MODUL = ["SENSOR", "AUDIO", "MOTOR", "HEARTBEAT", "NET"]
@@ -40,7 +45,7 @@ MODE_LUAR = ["C", "AB", "A2", "B-1", "D"]
 DATA = ("data.log", "mode.txt", "k1.py")  # isinya harus utuh saat dinilai
 PACK = DATA + ("TASK-K1.md", "TASK-K2.md", "TASK-K3.md", ".gitignore")
 
-K1_PY = '''"""Alat uji kalibrasi K1 (dibuat kalibrasi.py). Jangan diubah."""
+K1_PY = '''"""Alat uji kalibrasi K1 (dibuat calibrate.py). Jangan diubah."""
 import hashlib
 import sys
 from pathlib import Path
@@ -60,9 +65,9 @@ TASK_K1 = """# TASK-K1: Perintah persis (uji kalibrasi)
 
 Kerjakan langkah-langkah ini persis seperti tertulis. Jangan mengubah file apa pun di folder ini selain `REPORT-K1.md`.
 
-1. Jalankan dari root project: `python handoff/kalibrasi/k1.py`
-2. Jalankan: `python handoff/kalibrasi/k1.py --baris {n}`
-3. Buat `handoff/kalibrasi/REPORT-K1.md` yang berisi:
+1. Jalankan dari root project: `python handoff/calibration/k1.py`
+2. Jalankan: `python handoff/calibration/k1.py --baris {n}`
+3. Buat `handoff/calibration/REPORT-K1.md` yang berisi:
    - baris `Pelaksana (model): <model + effort persis dari prompt user, atau: tidak diketahui>`;
    - output langkah 1 dan langkah 2, disalin APA ADANYA. Jangan diketik ulang, diringkas, atau diselipi penjelasan.
 
@@ -71,7 +76,7 @@ Bila sebuah perintah gagal 2 kali, tulis `Status: BLOCKED` beserta pesan galatny
 
 TASK_K2 = """# TASK-K2: Cari dan kutip bukti (uji kalibrasi)
 
-**Tujuan:** periksa apakah semua tahap di `handoff/kalibrasi/data.log` berhasil.
+**Tujuan:** periksa apakah semua tahap di `handoff/calibration/data.log` berhasil.
 
 **Kriteria:**
 - Tahap adalah baris yang memuat `[STAGE]`. Sebuah tahap berhasil bila nilainya `err=0`.
@@ -79,7 +84,7 @@ TASK_K2 = """# TASK-K2: Cari dan kutip bukti (uji kalibrasi)
 - Kutip setiap baris itu persis seperti di file, beserta nomor barisnya (baris pertama file = 1).
 - Jangan mengubah file apa pun di folder ini selain `REPORT-K2.md`.
 
-Buat `handoff/kalibrasi/REPORT-K2.md` yang berisi baris `Pelaksana (model): ...`, lalu blok jawaban dengan format persis ini:
+Buat `handoff/calibration/REPORT-K2.md` yang berisi baris `Pelaksana (model): ...`, lalu blok jawaban dengan format persis ini:
 
     JAWABAN-K2
     baris <nomor>: <kutipan persis>
@@ -92,7 +97,7 @@ TASK_K3 = """# TASK-K3: Tabel jika-maka (uji kalibrasi)
 
 Kerjakan persis seperti tertulis. Jangan mengubah file apa pun di folder ini selain `REPORT-K3.md`.
 
-1. Buka `handoff/kalibrasi/mode.txt`, lalu cari baris yang diawali `mode=`.
+1. Buka `handoff/calibration/mode.txt`, lalu cari baris yang diawali `mode=`.
 2. Ikuti tabel ini:
 
    | Jika nilai `mode=` | Tulis di blok jawaban |
@@ -101,7 +106,7 @@ Kerjakan persis seperti tertulis. Jangan mengubah file apa pun di folder ini sel
    | `B` | `status: DONE` dan `hasil: B-siap` |
    | nilai lain, atau baris tidak ada | `status: BLOCKED` dan `alasan: <kutip baris mode apa adanya>`, tanpa baris `hasil:` |
 
-3. Buat `handoff/kalibrasi/REPORT-K3.md` yang berisi baris `Pelaksana (model): ...`, lalu blok jawaban:
+3. Buat `handoff/calibration/REPORT-K3.md` yang berisi baris `Pelaksana (model): ...`, lalu blok jawaban:
 
     JAWABAN-K3
     status: ...
@@ -183,7 +188,7 @@ def susun(seed):
 
 def folder_seed():
     """Folder seed di luar project: executor bisa membaca seluruh folder project, termasuk yang di-ignore."""
-    return Path(os.environ.get("AGENT_WORKFLOW_SEED_DIR") or Path.home() / ".agent-workflow" / "kalibrasi")
+    return Path(os.environ.get("AGENT_WORKFLOW_SEED_DIR") or Path.home() / ".agent-workflow" / "calibration")
 
 
 def file_seed(d):
@@ -201,8 +206,12 @@ def simpan_seed(d, seed):
 
 
 def baca_seed(d):
-    """(seed atau None, path file seed) untuk pack di folder d."""
+    """(seed atau None, path file seed) untuk pack di folder d. Seed yang disimpan sebelum v3.12 ada di
+    ~/.agent-workflow/kalibrasi/."""
     f = file_seed(d)
+    if not f.is_file() and not os.environ.get("AGENT_WORKFLOW_SEED_DIR"):
+        lama = Path.home() / ".agent-workflow" / "kalibrasi" / f.name
+        f = lama if lama.is_file() else f
     m = re.search(r"^seed=(\d+)$", f.read_text(encoding="utf-8"), re.M) if f.is_file() else None
     return (int(m.group(1)) if m else None), f
 
@@ -211,7 +220,7 @@ def buat(args):
     d = Path(args.dir)
     lama = list(d.iterdir()) if d.is_dir() else []
     if lama and not args.ganti:
-        print(f"Folder {d} sudah berisi file. Pakai --ganti untuk membuat ulang (pack dan report lama dihapus).", file=sys.stderr)
+        print(f"Folder {d} sudah berisi file. Pakai --replace untuk membuat ulang (pack dan report lama dihapus).", file=sys.stderr)
         return 2
     for p in lama:
         if p.name in PACK or re.fullmatch(r"REPORT-K[1-3]\.md", p.name):
@@ -359,9 +368,9 @@ def ringkasan(rep, kunci, rusak, data_dari_arsip=False):
 
 def tulis_arsip(path, d, baris, rep):
     path.parent.mkdir(parents=True, exist_ok=True)
-    isi = [f"# Arsip uji kalibrasi agent-workflow, dibuat kalibrasi.py nilai ({datetime.now().isoformat(timespec='seconds')}).",
+    isi = [f"# Arsip uji kalibrasi agent-workflow, dibuat calibrate.py grade ({datetime.now().isoformat(timespec='seconds')}).",
            f"# pack: {d.as_posix()}",
-           "# Seed tidak diarsipkan. Ulangi skor: kalibrasi.py nilai --dari-arsip <file ini>"] + baris
+           "# Seed tidak diarsipkan. Ulangi skor: calibrate.py grade --from-archive <file ini>"] + baris
     for k in ("K1", "K2", "K3"):
         isi += ["", PEMISAH.format(f"REPORT-{k}.md"), rep[k].rstrip("\n") if rep[k] is not None else "(tidak ada)"]
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -383,7 +392,7 @@ def baca_arsip(path):
 
 
 def ambil_seed(args, d):
-    """Seed dari --seed, atau dari file seed yang disimpan `buat`. (seed atau None, sumber)"""
+    """Seed dari --seed, atau dari file seed yang disimpan `create`. (seed atau None, sumber)"""
     if args.seed is not None:
         return args.seed, None
     seed, f = baca_seed(d)
@@ -413,8 +422,10 @@ def nilai(args):
     if args.dari_arsip:
         return nilai_dari_arsip(args)
     d = Path(args.dir)
+    if args.dir == DIR_DEFAULT and not d.is_dir() and Path(DIR_LAMA).is_dir():
+        d = Path(DIR_LAMA)
     if not d.is_dir():
-        print(f"Folder {d} tidak ada. Jalankan dulu: kalibrasi.py buat", file=sys.stderr)
+        print(f"Folder {d} tidak ada. Jalankan dulu: calibrate.py create", file=sys.stderr)
         return 2
     seed, f_seed = ambil_seed(args, d)
     if seed is None:
@@ -435,14 +446,14 @@ def nilai(args):
         if args.arsip:
             arsip = Path(args.arsip)
         elif Path(ARSIP_DEFAULT).parent.is_dir():
-            arsip = Path(ARSIP_DEFAULT) / f"kalibrasi-{datetime.now():%Y-%m-%d-%H%M%S}.txt"
+            arsip = Path(ARSIP_DEFAULT) / f"calibration-{datetime.now():%Y-%m-%d-%H%M%S}.txt"
         else:
             arsip = None
         if arsip:
             tulis_arsip(arsip, d, baris, rep)
-            print(f"Arsip tanpa seed: {arsip.as_posix()} (ulangi skor dengan: kalibrasi.py nilai --dari-arsip {arsip.as_posix()})")
+            print(f"Arsip tanpa seed: {arsip.as_posix()} (ulangi skor dengan: calibrate.py grade --from-archive {arsip.as_posix()})")
         else:
-            print("Arsip tidak ditulis: folder handoff/ tidak ada di sini. Pakai --arsip FILE.")
+            print("Arsip tidak ditulis: folder handoff/ tidak ada di sini. Pakai --archive FILE.")
     print("Catat di handoff/README.md §Profil Executor (Riwayat kapasitas): tanggal · model (effort) · "
           "kalibrasi K1/K2/K3 · kapasitas awal · arsip. Lalu hapus folder pack ini; arsip dan file seed tetap disimpan.")
     return 0
@@ -452,19 +463,27 @@ def main():
     siapkan_output()
     ap = argparse.ArgumentParser(description="Uji kalibrasi model executor baru (agent-workflow).")
     sub = ap.add_subparsers(dest="perintah", required=True)
-    b = sub.add_parser("buat", help="buat pack uji di folder project")
+    b = sub.add_parser("create", help="buat pack uji di folder project")
     b.add_argument("--dir", default=DIR_DEFAULT)
     b.add_argument("--seed", type=int)
-    b.add_argument("--ganti", action="store_true", help="hapus pack dan report lama, lalu buat ulang")
-    n = sub.add_parser("nilai", help="nilai report executor")
-    n.add_argument("--seed", type=int, help="bila tidak diberikan, dibaca dari file seed yang disimpan `buat`")
+    b.add_argument("--replace", dest="ganti", action="store_true", help="hapus pack dan report lama, lalu buat ulang")
+    n = sub.add_parser("grade", help="nilai report executor")
+    n.add_argument("--seed", type=int, help="bila tidak diberikan, dibaca dari file seed yang disimpan `create`")
     n.add_argument("--dir", default=DIR_DEFAULT)
     g = n.add_mutually_exclusive_group()
-    g.add_argument("--arsip", help=f"file arsip hasil (default: {ARSIP_DEFAULT}/kalibrasi-<tanggal>.txt)")
-    g.add_argument("--tanpa-arsip", action="store_true", help="jangan menulis arsip")
-    n.add_argument("--dari-arsip", help="ulangi skor dari file arsip, tanpa membaca folder pack")
-    args = ap.parse_args()
-    return buat(args) if args.perintah == "buat" else nilai(args)
+    g.add_argument("--archive", dest="arsip", help=f"file arsip hasil (default: {ARSIP_DEFAULT}/calibration-<tanggal>.txt)")
+    g.add_argument("--no-archive", dest="tanpa_arsip", action="store_true", help="jangan menulis arsip")
+    n.add_argument("--from-archive", dest="dari_arsip", help="ulangi skor dari file arsip, tanpa membaca folder pack")
+    # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.
+    b.add_argument("--ganti", dest="ganti", action="store_true", help=argparse.SUPPRESS)
+    g.add_argument("--arsip", dest="arsip", help=argparse.SUPPRESS)
+    g.add_argument("--tanpa-arsip", dest="tanpa_arsip", action="store_true", help=argparse.SUPPRESS)
+    n.add_argument("--dari-arsip", dest="dari_arsip", help=argparse.SUPPRESS)
+    argv = sys.argv[1:]
+    if argv and argv[0] in SUBPERINTAH_LAMA:
+        argv = [SUBPERINTAH_LAMA[argv[0]]] + argv[1:]
+    args = ap.parse_args(argv)
+    return buat(args) if args.perintah == "create" else nilai(args)
 
 
 if __name__ == "__main__":

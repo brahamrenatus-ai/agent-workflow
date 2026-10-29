@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cek secret di file sebelum commit, tanpa mencetak nilainya.
 
-Skill agent-workflow memasang skrip ini ke handoff/tools/cek_secret.py. Isi SECRET_FILES di bawah
+Skill agent-workflow memasang skrip ini ke handoff/tools/check_secrets.py. Isi SECRET_FILES di bawah
 dengan file secret lokal project (yang di-ignore git). Bila daftar itu kosong, skrip mencari sendiri
 file secret yang lazim (secrets.h, .env, secrets.json, ...).
 
@@ -19,13 +19,13 @@ Yang dicari:
 Scan pola saja tidak cukup: token tanpa awalan khas (mis. refresh token Spotify) akan lolos.
 
 Pemakaian (folder, file, atau pola glob; glob diproses skrip ini, jadi aman di PowerShell):
-  python handoff/tools/cek_secret.py handoff/logs
-  python handoff/tools/cek_secret.py handoff/logs/x.log --redact   # ganti temuan dengan <REDACTED>
-  python handoff/tools/cek_secret.py --staged                      # file yang di-stage untuk commit
-  python handoff/tools/cek_secret.py --list-sources                # file secret yang terbaca, tanpa nilai
+  python handoff/tools/check_secrets.py handoff/logs
+  python handoff/tools/check_secrets.py handoff/logs/x.log --redact   # ganti temuan dengan <REDACTED>
+  python handoff/tools/check_secrets.py --staged                      # file yang di-stage untuk commit
+  python handoff/tools/check_secrets.py --list-sources                # file secret yang terbaca, tanpa nilai
 
-Log yang tercatat di handoff/logs/asal.jsonl (dibuat catat.py) dan disamarkan dengan --redact mendapat catatan
-asal baru berjenis "redact", supaya cek_bukti.py tidak menandainya "berubah setelah dicatat". Catatan itu hanya
+Log yang tercatat di handoff/logs/provenance.jsonl (dibuat record.py) dan disamarkan dengan --redact mendapat catatan
+asal baru berjenis "redact", supaya check_evidence.py tidak menandainya "berubah setelah dicatat". Catatan itu hanya
 ditambahkan bila isi log sebelum disamarkan masih sama dengan catatan terakhirnya, jadi log yang diedit tangan
 tidak ikut disahkan.
 
@@ -56,7 +56,8 @@ BUKAN_RAHASIA = re.compile(r"(SSID|HOST|PORT|REGION|ENDPOINT|DOMAIN|(^|_)USER(NA
 URL_TANPA_KREDENSIAL = re.compile(r"^(?!.*://[^/\s:@]+:[^/\s@]+@)")  # URL tanpa user:password@ bukan rahasia
 PLACEHOLDER = re.compile(r"(your|xxx|changeme|example|placeholder|masukkan|ganti|isi_|dummy|todo|<|>|\.\.\.)", re.I)
 MAKS_UKURAN = 100 * 1024 * 1024
-ASAL = Path("handoff") / "logs" / "asal.jsonl"
+ASAL = Path("handoff") / "logs" / "provenance.jsonl"
+ASAL_LAMA = Path("handoff") / "logs" / "asal.jsonl"  # nama sebelum v3.12, dipakai bila provenance.jsonl belum ada
 
 _TB = r"(?<![A-Za-z0-9_\-])"  # batas token: jangan cocok di tengah kata (mis. "task-...")
 POLA = [
@@ -203,14 +204,15 @@ def kumpulkan(root, paths, staged, lewati):
 
 
 def hash_isi(path):
-    """SHA-256 isi file dengan CRLF disamakan menjadi LF (sama persis dengan catat.py dan cek_bukti.py)."""
+    """SHA-256 isi file dengan CRLF disamakan menjadi LF (sama persis dengan record.py dan check_evidence.py)."""
     return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def perbarui_asal(root, path, sebelum):
-    """Log dari catat.py yang baru disamarkan mendapat catatan asal berjenis redact (perintah asal tetap dicatat).
+    """Log dari record.py yang baru disamarkan mendapat catatan asal berjenis redact (perintah asal tetap dicatat).
     Hanya bila hash isi sebelum disamarkan sama dengan catatan terakhirnya: log yang diedit tangan tidak ikut disahkan."""
-    asal = root / ASAL
+    nama = ASAL_LAMA if not (root / ASAL).is_file() and (root / ASAL_LAMA).is_file() else ASAL
+    asal = root / nama
     try:
         rel = path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
@@ -228,14 +230,14 @@ def perbarui_asal(root, path, sebelum):
     if terakhir is None:
         return
     if terakhir.get("sha256") != sebelum:
-        print(f"PERINGATAN: {rel} sudah berubah setelah dicatat catat.py, jadi catatan asalnya tidak diperbarui "
-              "(cek_bukti.py tetap menandainya). Jalankan ulang perintahnya lewat catat.py.")
+        print(f"PERINGATAN: {rel} sudah berubah setelah dicatat record.py, jadi catatan asalnya tidak diperbarui "
+              "(check_evidence.py tetap menandainya). Jalankan ulang perintahnya lewat record.py.")
         return
     rec = dict(terakhir, jenis="redact", sha256=hash_isi(path), sha256_sebelum=sebelum,
                disamarkan=datetime.now().isoformat(timespec="seconds"))
     with open(asal, "a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    print(f"{rel}: catatan asal redact ditambahkan; git add ulang {ASAL.as_posix()} bersama log ini.")
+    print(f"{rel}: catatan asal redact ditambahkan; git add ulang {nama.as_posix()} bersama log ini.")
 
 
 def periksa(path, values, redact, root):
