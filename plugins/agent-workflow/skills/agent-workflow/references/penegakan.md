@@ -43,6 +43,22 @@ Pasang hanya setelah user setuju, lalu catat di NOTES (register keputusan). Sint
 - Bila tersedia, isi daftar perintah yang ditolak untuk operasi berisiko.
 - Nama menunya bisa berbeda antar versi; cek setelan Antigravity.
 
+## Orca (peluncur agen)
+Orca menambahkan flag izin saat meluncurkan agen (`worker-start`, `agent launch`, tab agen baru), menurut **Settings → Agents → Permissions**. Setelan ini bisa berbeda per agen. Pemetaan di Orca 1.4.243:
+
+| Setelan Orca | Claude Code | Antigravity (`agy`) |
+|---|---|---|
+| Agents' own settings | tanpa flag: `defaultMode` dan aturan `.claude/settings*.json` | tanpa flag: setelan Antigravity CLI sendiri |
+| Ask for approval | `--permission-mode default` | tanpa flag |
+| Accept edits | `--permission-mode acceptEdits` | tanpa flag |
+| Approve for me | `--permission-mode auto` | tanpa flag |
+| Full access | `--dangerously-skip-permissions` | `--dangerously-skip-permissions` |
+
+- **`Full access`** melewati prompt izin agen. Antigravity menyetujui semua permintaan izin alat tanpa bertanya (`agy --help`). Claude Code dalam mode bypass tetap meminta izin untuk aturan `ask` eksplisit dan tetap memblokir aturan `deny` (dokumentasi Claude Code, dicek 2026-10-29), tetapi perintah lain jalan tanpa prompt, termasuk bentuk lain dari perintah berisiko yang tidak cocok dengan aturan teks (lihat **Keterbatasan** di atas). Saat pertama dipakai, Claude Code juga menampilkan dialog persetujuan mode bypass, dan worker macet sampai user menjawabnya.
+- **Project yang punya operasi berisiko** (flash, deploy, data produksi, push): untuk Claude Code pakai `Approve for me` (classifier memeriksa aksi, dan aturan `ask` tetap meminta izin) atau `Ask for approval`. Untuk Antigravity pakai setelannya sendiri, yang diatur seperti bagian Antigravity di atas.
+- **Prompt izin dijawab user.** Worker yang menunggu persetujuan tampil "Waiting on you" di Orca. User menjawabnya di terminal worker; head tidak menjawabnya lewat `orca terminal send`.
+- **Ubah setelan hanya atas persetujuan user** dan catat di register keputusan. Sesudahnya, periksa terminal worker berikutnya: Claude Code menampilkan mode izinnya di baris status. Setelan berlaku untuk semua project yang meluncurkan agen lewat Orca di mesin itu.
+
 ## Cline (dan tool sejenis untuk AI lokal)
 - Matikan auto-approve untuk menjalankan perintah, dan untuk edit file bila perlu.
 - Pakai `.clineignore` untuk menyembunyikan secret, data produksi, dan skrip berbahaya dari model.

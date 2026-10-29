@@ -196,8 +196,23 @@ Pengulangan uji juga menemukan kegagalan sesekali di Windows (1 dari 6 run): `Pe
 |---|---|---|---|---|
 | I5 | `foto_tampilan.py` versi ini: halaman dengan rute hash termuat di setiap ukuran | `handoff/tools/foto_tampilan.py` | Salin ulang `scripts/foto_tampilan.py` | – |
 
+## v3.11 (2026-10-29): head memilih model per task, executor lewat Orca
+Berasal dari permintaan user agar head mengatur sendiri model executor per task, termasuk model Claude saat task melebihi kapasitas Gemini Flash, dan dari uji coba Orca di aplikasi budidaya. Dalam uji coba itu head meluncurkan Gemini 3.8 Flash (high) di Antigravity lewat `orca orchestration worker-start`, dan isi `worker_done` cocok dengan hasil yang diulang. Pemeriksaan sesudahnya menemukan dua hal yang lolos dari uji coba:
+- setelan izin agen Orca (`Full access`) meluncurkan executor dengan `--dangerously-skip-permissions`;
+- terminal Claude Code siaga macet di dialog persetujuan mode bypass, sehingga tidak pernah siap dipakai.
+
+Model yang diminta juga belum tentu model yang berjalan; Orca mencatat model yang benar-benar dipakai sebagai `launch.effective` di receipt. Perubahan lain tanpa penanda baru: `references/orca.md`, bagian Orca di `references/penegakan.md`, Pelajaran 26, dan syarat `@bila_orca` di `scripts/cek_versi.py`.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| M5 | Head memilih model per task: yang termurah dengan kapasitas cukup, mengikuti urutan pilihan user, kecuali ada Kebiasaan gagal yang mengenai task itu; alasannya ditulis di header task; model tanpa kapasitas dikalibrasi dulu | instruksi head, `handoff/README.md` | T1 langkah 4 (**Pilihan model per task**); T3 §Format Task (`Model:` + alasan) | – |
+| M6 | Profil Executor mencatat tool per model dan urutan pilihan model dari user | `handoff/README.md` | T3 §Profil Executor (kolom Tool, butir **Urutan pilihan model**; baris `Tool:` menyebut semua tool executor) | Urutan pilihan: keputusan user |
+| D4 | Head menjalankan executor lewat Orca: satu Run per sesi, satu task per dispatch di folder project, model dicocokkan dengan `launch.effective`, `worker_done` bukan bukti, worker dilepas sesudah triase, prompt izin worker dijawab user | instruksi head | T1 §Executor lewat Orca; cara cek di `references/orca.md` | Pemakaian Orca: konfirmasi ke user |
+| D5 | Executor yang dijalankan lewat Orca bertanya lewat `ask`, tidak menganggap balasan head sebagai izin user, dan mengirim `worker_done` sesudah DONE/BLOCKED beserta path report | brief executor | T2a paragraf **Dijalankan lewat Orca** dan langkah 6 / T2b langkah 7 | – |
+| D6 | Profil Executor mencatat peluncuran Orca per model dan setelan izin agen di Orca; dispatch baca-saja sudah dicek jalan | `handoff/README.md` | T3 §Profil Executor (kolom Peluncuran Orca, butir **Orca**); pemetaan izin di `references/penegakan.md` §Orca | Setelan izin agen: keputusan user |
+
 ## Penanda
-Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui]`.
+Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
   - `head~teks`, `executor~teks`, `dev~teks`: teks ada di instruksi peran itu;
   - `readme~teks`, `roadmap~teks`, `notes~teks`: teks ada di file `handoff/` yang bersangkutan;
@@ -208,6 +223,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 - **Cara mencocokkan:** teks dicocokkan tanpa peduli huruf besar-kecil. `||` berarti cukup salah satu. Penanda teks (`head~`, `readme~`, `file:`, dst.) juga dianggap ada bila file sasarannya memuat tag `<!-- aw: ID -->` dengan ID penanda itu.
 - **`@bila_secret`:** penanda itu hanya berlaku bila project punya file secret lokal.
 - **`@bila_ui`:** penanda itu hanya berlaku bila project punya antarmuka pengguna: framework UI di `package.json` (React, Vue, Svelte, Angular, Next, Vite, Electron, React Native, …), Flutter, atau file khas UI (`*.html`, `*.vue`, `*.svelte`, `*.jsx`, `*.tsx`, `*.xaml`, `*.storyboard`, `*.qml`, `AndroidManifest.xml`) di luar `handoff/` dan folder hasil build.
+- **`@bila_orca`:** penanda itu hanya berlaku bila protokol mencatat bahwa head menjalankan executor lewat Orca, yaitu bila `handoff/README.md` atau instruksi head menyebut kata `Orca`. Project yang baru akan memakai Orca belum mendapat kandidat ini dari `cek_versi.py`; AUDIT menanyakannya di putaran tanya (SKILL.md §2), lalu memasang D4–D6.
 
 ```penanda
 2.1  B1    ada~handoff/ROADMAP.md || ada~ROADMAP.md
@@ -284,4 +300,9 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.10 Y7    file:handoff/tools/cek_bukti.py~def glob_rx
 3.10.1 I4  ada~handoff/tools/foto_tampilan.py  @bila_ui
 3.10.2 I5  file:handoff/tools/foto_tampilan.py~def buka_halaman  @bila_ui
+3.11 M5    head~Pilihan model per task
+3.11 M6    readme~Urutan pilihan model
+3.11 D4    head~worker-start  @bila_orca
+3.11 D5    executor~worker_done  @bila_orca
+3.11 D6    readme~Izin agen di Orca  @bila_orca
 ```

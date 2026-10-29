@@ -15,8 +15,9 @@ Penanda teks dianggap ada bila teksnya ditemukan, atau bila file sasarannya memu
 penanda itu. Tag ikut tersalin dari template, jadi aturan tetap dikenali walau protokol ditulis dalam bahasa lain.
 
 Penanda yang file sasarannya tidak ada (mis. instruksi executor di project LITE) dicatat "n/a", bukan "hilang".
-Penanda bersyarat juga "n/a" bila syaratnya tidak terpenuhi: `@bila_secret` (project punya file secret lokal) dan
-`@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop).
+Penanda bersyarat juga "n/a" bila syaratnya tidak terpenuhi: `@bila_secret` (project punya file secret lokal),
+`@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop), dan `@bila_orca` (README handoff atau
+instruksi head menyebut Orca, yaitu head menjalankan executor lewat Orca).
 Exit code: 0 = semua penanda yang berlaku ada, 1 = ada yang hilang.
 """
 import fnmatch
@@ -128,6 +129,13 @@ def ada_ui(root):
     return False
 
 
+def ada_orca(root):
+    """True bila protokol mencatat bahwa head menjalankan executor lewat Orca: kata `Orca` di handoff/README.md
+    atau di instruksi head. Orca sendiri tidak dipanggil, karena di Linux `orca` bisa berarti pembaca layar."""
+    return any(re.search(r"\borca\b", f.read_text(encoding="utf-8", errors="replace"), re.I)
+               for f in file_peran(root, "readme") + file_peran(root, "head"))
+
+
 def cocok(teks, isi):
     teks = teks.strip()
     if teks.startswith("re:"):
@@ -200,7 +208,7 @@ def main():
     siapkan_output()
     root = root_repo()
     penanda = muat_changelog()
-    kondisi = {"bila_secret": ada_file_secret(root), "bila_ui": ada_ui(root)}
+    kondisi = {"bila_secret": ada_file_secret(root), "bila_ui": ada_ui(root), "bila_orca": ada_orca(root)}
     tertulis = None
     for f in file_peran(root, "readme") + file_peran(root, "dev"):
         m = re.search(r"agent-workflow v(\d+(?:\.\d+)*)", f.read_text(encoding="utf-8", errors="replace"))
@@ -209,7 +217,8 @@ def main():
             break
     print(f"Root: {root}")
     print(f"Penanda versi tertulis: {'v' + tertulis if tertulis else 'tidak ada'} | file secret lokal: "
-          f"{'ada' if kondisi['bila_secret'] else 'tidak ada'} | UI: {'ada' if kondisi['bila_ui'] else 'tidak ada'}")
+          f"{'ada' if kondisi['bila_secret'] else 'tidak ada'} | UI: {'ada' if kondisi['bila_ui'] else 'tidak ada'}"
+          f" | Orca: {'ada' if kondisi['bila_orca'] else 'tidak ada'}")
     per_versi, hilang = {}, []
     for versi, pid, specs, syarat, lab in penanda:
         if not all(kondisi.get(s, True) for s in syarat):

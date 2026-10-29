@@ -18,6 +18,7 @@ Every rule comes from a failure seen in real projects, recorded in the skill's *
 - A cheap executor was promoted, then failed its first harder task twice. Promotion now needs evidence in the target format plus a probation period.
 - UI tasks passed their tests while the screens were wrong (buttons too small, tabs off-screen). Visual criteria are now checked from screenshots.
 - A second session re-ran a finished task and overwrote the first session's evidence logs. Executors now stop on tasks that are not `OPEN`, and the log wrapper refuses to overwrite logs of finished tasks.
+- A trial of launching executors through [Orca](https://github.com/stablyai/orca) looked successful, but Orca's "Full access" setting had started the executor with `--dangerously-skip-permissions`, and a standby Claude Code terminal sat at the bypass-mode consent dialog. The head now checks the launcher's permission setting and reads the model from the launch receipt, not from the request.
 
 ## What it does
 
@@ -29,6 +30,8 @@ Every rule comes from a failure seen in real projects, recorded in the skill's *
 | STRUKTUR | You only want the project's file structure checked | Structure map with findings labelled required / standard / taste |
 
 Executor capacity has three levels (TINGGI/SEDANG/RENDAH, i.e. high/medium/low). Each level changes how tasks are written, how much design freedom the executor gets, and how deeply the head verifies. A new model can be placed with a 15-minute **calibration test** scored by a script.
+
+Capacity is tracked **per model**, so one project can use several executor models across tools (for example Gemini Flash in Antigravity for routine work, Claude in Claude Code for harder tasks). The head picks the model for each task: the cheapest one whose capacity is enough, following the user's preference order, and writes the reason in the task. With **Orca**, the head also launches that model itself (`orca orchestration worker-start`), waits for `worker_done`, and still triages the report from files; see `references/orca.md`.
 
 ### Bundled scripts
 
@@ -79,7 +82,7 @@ The skill version is in `SKILL.md` and `references/changelog.md`. Each version l
 python tests/run_tests.py
 ```
 
-This runs a structure check (frontmatter, version consistency, every changelog marker present in the templates and tagged in every template variant, LF line endings) and functional tests of every script in temporary projects. CI runs the same on Linux, Windows, and macOS.
+This runs a structure check (frontmatter, version consistency, every changelog marker present in the templates and tagged in every template variant, LF line endings) and functional tests of every script in temporary projects. CI runs the same on Linux, Windows, and macOS. Tests that need Chrome or Orca are skipped when those are not installed; `test_orca_cli.py` checks every `orca` command and option written in the skill against the installed Orca's `--help`.
 
 When adding a rule that ends up in project files: add a row to the version's table in `references/changelog.md`, a marker in the `penanda` block, the rule text in every template variant that produces the target file, and the `<!-- aw: ID -->` tag on that line. Bump the version in `SKILL.md`, the changelog, and `plugins/agent-workflow/.claude-plugin/plugin.json` together.
 

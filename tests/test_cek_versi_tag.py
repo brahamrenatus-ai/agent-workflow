@@ -1,5 +1,5 @@
 """Uji cek_versi.py v3.10: penanda dikenali lewat tag <!-- aw: ID --> walau teks protokol bukan bahasa Indonesia,
-dan syarat @bila_ui. Fixture dibuat dari template skill: setiap baris dibuang teksnya, hanya tag yang disisakan,
+syarat @bila_ui, dan (sejak v3.11) syarat @bila_orca. Fixture dibuat dari template skill: setiap baris dibuang teksnya, hanya tag yang disisakan,
 lalu diberi teks pengisi berbahasa Inggris. Dengan begitu satu-satunya jalan penanda teks terpenuhi adalah tag.
 Pemakaian: python -X utf8 tests/test_cek_versi_tag.py <folder skill>"""
 import re
@@ -122,6 +122,35 @@ try:
     p.write_text(p.read_text(encoding="utf-8").replace("Z1", "Z10"), encoding="utf-8")
     rc, out = jalan(e)
     cek(rc == 1 and re.search(r"^  - Z1 \(", out, re.M), "tag dicocokkan per ID utuh (Z10 bukan Z1)", out)
+
+    if "def ada_orca" in CEK.read_text(encoding="utf-8"):  # syarat @bila_orca ada sejak v3.11
+        rc, out = jalan(a)
+        cek("| Orca: tidak ada" in out, "protokol tanpa kata Orca: syarat @bila_orca tidak terpenuhi", out)
+        f = tmp / "orca"
+        buat(f)
+        p = f / "handoff/README.md"
+        p.write_text(p.read_text(encoding="utf-8") + "- Executors are launched by the head through Orca.\n", encoding="utf-8")
+        rc, out = jalan(f)
+        cek(rc == 0 and "| Orca: ada" in out and f"Versi efektif: v{versi}" in out,
+            "README menyebut Orca, aturan Orca bertag: syarat terpenuhi dan D4–D6 dikenali lewat tag", out)
+        for rel in (".claude/skills/demo-head/SKILL.md", ".claude/skills/demo-executor/SKILL.md", "handoff/README.md"):
+            p = f / rel
+            p.write_text(re.sub(r"\b(D4|D5|D6)\b", "XX", p.read_text(encoding="utf-8")), encoding="utf-8")
+        rc, out = jalan(f)
+        hilang = set(re.findall(r"^  - ([A-Z0-9-]+) \(", out, re.M))
+        cek(rc == 1 and hilang == {"D4", "D5", "D6"}, "project memakai Orca tanpa aturan Orca: tepat D4, D5, D6 jadi kandidat", out)
+        g = tmp / "orca_di_head"
+        buat(g)
+        p = g / ".claude/skills/demo-head/SKILL.md"
+        p.write_text(p.read_text(encoding="utf-8") + "Dispatch executors with ORCA.\n", encoding="utf-8")
+        rc, out = jalan(g)
+        cek(rc == 0 and "| Orca: ada" in out, "kata Orca di instruksi head juga memenuhi syarat (tanpa peka huruf besar-kecil)", out)
+        p = g / "handoff/README.md"
+        p.write_text(p.read_text(encoding="utf-8") + "- Model orcanet-7b; whales: orcas.\n", encoding="utf-8")
+        p = g / ".claude/skills/demo-head/SKILL.md"
+        p.write_text(p.read_text(encoding="utf-8").replace("ORCA", "orcanet"), encoding="utf-8")
+        rc, out = jalan(g)
+        cek("| Orca: tidak ada" in out, "kata yang hanya memuat 'orca' (orcanet, orcas) tidak dihitung", out)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")

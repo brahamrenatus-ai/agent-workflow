@@ -1,11 +1,11 @@
 ---
 name: agent-workflow
-description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/pelaksana) untuk project apa pun, termasuk head bermodel pintar dengan executor murah atau AI lokal. Membuat skill head & executor khusus project, folder handoff (tasks, reports, NOTES, ROADMAP), jenis task sesuai kapasitas executor, alat cek bukti dan secret, aturan agar project tidak macet di loop analisis, serta peta struktur file sesuai standar framework. Gunakan saat user ingin membuat skill pengembangan untuk project-nya, menyiapkan head/executor atau protokol handoff antar-model, mengevaluasi atau meng-upgrade skill agen yang ada, mengeluh agennya kaku atau project-nya jalan di tempat, menanyakan susunan folder project, atau menilai apakah sebuah model layak menjadi executor, walau tidak menyebut kata "skill". EN: set up or audit a planner/executor (head/executor) agent workflow with file-based handoff, evidence checks, and tasks tuned to the executor model's capacity.
+description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/pelaksana) untuk project apa pun, termasuk head bermodel pintar dengan executor murah atau AI lokal. Membuat skill head & executor khusus project, folder handoff (tasks, reports, NOTES, ROADMAP), jenis task sesuai kapasitas executor, pilihan model executor per task (juga lewat Orca), alat cek bukti dan secret, aturan agar project tidak macet di loop analisis, serta peta struktur file sesuai standar framework. Gunakan saat user ingin membuat skill pengembangan untuk project-nya, menyiapkan head/executor atau protokol handoff antar-model, mengevaluasi atau meng-upgrade skill agen yang ada, mengeluh agennya kaku atau project-nya jalan di tempat, menanyakan susunan folder project, atau menilai apakah sebuah model layak menjadi executor, walau tidak menyebut kata "skill". EN: set up or audit a planner/executor (head/executor) agent workflow with file-based handoff, evidence checks, and tasks tuned to the executor model's capacity.
 ---
 
 # Agent Workflow — Head + Executor untuk Project Apa Pun
 
-**Versi skill: 3.10.2.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
+**Versi skill: 3.11.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
 
 Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewat file di repo:
 - **Head** (perencana) menjaga arah, menganalisis hasil, memutuskan, mendesain, menulis task, dan memverifikasi.
@@ -21,6 +21,7 @@ File pendukung di folder skill ini dibaca hanya saat dibutuhkan:
 - `scripts/foto_tampilan.py`: tangkapan layar halaman web di beberapa ukuran layar dengan emulasi perangkat, ditambah pengukur halaman dan elemen yang lebih lebar dari layar. Disalin ke project ber-UI.
 - `references/changelog.md` dan `scripts/cek_versi.py`: perubahan per versi (file sasaran, cara patch, penanda), dan skrip yang membandingkan penanda itu dengan isi project, termasuk apakah instruksi tiap peran bisa ditemukan tool-nya. Dipakai jalur upgrade di AUDIT; skripnya dijalankan dari folder skill, tidak disalin ke project.
 - `references/rendah.md` dan `scripts/kalibrasi.py`: executor RENDAH (bukti dari skrip, ukuran task, rantai task) dan uji kalibrasi model baru. Skrip kalibrasi dijalankan dari folder skill; seed-nya disimpan di luar folder project, dan hasil penilaiannya diarsipkan ke `handoff/logs/`.
+- `references/orca.md`: head yang menjalankan executor lewat Orca, yaitu peluncuran per task dengan model pilihan head, setelan izin agen, kalibrasi lewat Orca, dan uji sebelum dipakai. Dibaca bila project memakai Orca.
 
 Aturan di sini lahir dari kegagalan nyata di tiga project lapangan, yang disebut menurut jenisnya:
 - **Robot meja** (firmware ESP32): sekitar 30 dari 42 task berupa pengukuran ulang, dan bug kritis yang sudah tertulis di dokumen audit baru ditemukan 11 hari kemudian.
@@ -103,6 +104,9 @@ Jelaskan mode yang dipilih beserta alasannya. Dua agen menambah latensi, karena 
     - Kriteria tampilan ditulis bisa dicek: rujukan mockup dan ukuran layar sasaran. Yang terukur dinilai skrip audit peramban; yang butuh mata dinilai head dari tangkapan layar (`head:`) atau oleh user (`user:`).
     - Untuk komponen yang perilakunya sulit diduga, implementasi rujukan head yang diuji sebelum task ditulis menemukan jebakan desain lebih murah daripada satu siklus koreksi.
     - Alat fotonya juga harus diverifikasi. Contoh dari pengembangan skill ini: `chrome --headless --window-size=375,812` menata halaman selebar ±500 px lalu memotong fotonya, sehingga dasbor robot meja tampak terpotong di "HP" padahal muat. Temuan palsu itu sempat ter-commit ke ROADMAP. `scripts/foto_tampilan.py` memakai emulasi perangkat dan mencetak lebar layar yang benar-benar dipakai.
+26. **Alat yang meluncurkan executor ikut menentukan izin dan modelnya.**
+    - Contoh dari pengembangan skill ini: uji coba Orca di aplikasi budidaya dinyatakan berhasil, padahal setelan izin Orca (`Full access`) meluncurkan executor Antigravity dengan `--dangerously-skip-permissions`. Terminal Claude Code yang disiapkan sebagai cadangan juga macet di dialog persetujuan mode bypass, dan tidak ada yang tahu sampai pemeriksaan berikutnya.
+    - Periksa flag izin yang ditambahkan peluncur sebelum task berisiko didelegasikan. Ambil model dan effort dari bukti peluncuran (receipt), bukan dari yang diminta, dan jalankan uji pertama dengan task baca-saja.
 
 ## Langkah Kerja
 
@@ -119,7 +123,7 @@ Perintah yang tidak ada di repo jangan dikarang; tulis "belum diketahui" dan jad
 
 ### 2. Tanyakan & Konfirmasi
 Gabungkan jadi satu kali bertanya (pakai alat tanya-jawab bila ada). Keempat butir ini **selalu** masuk putaran itu, termasuk saat AUDIT:
-1. **Tool, model, dan effort** untuk head dan untuk executor. Ini menentukan lokasi instruksi (§3) dan kapasitas executor (§Kapasitas Executor). Untuk AI lokal, tanyakan juga perkiraan panjang konteksnya. Bila executor berganti model per task di satu tool, catat setiap model yang dipakai. Model tanpa riwayat di project ditawari uji kalibrasi.
+1. **Tool, model, dan effort** untuk head dan untuk executor. Ini menentukan lokasi instruksi (§3) dan kapasitas executor (§Kapasitas Executor). Untuk AI lokal, tanyakan juga perkiraan panjang konteksnya. Bila executor berganti model per task di satu tool, catat setiap model yang dipakai. Model tanpa riwayat di project ditawari uji kalibrasi. Tanyakan juga apakah head menjalankan executor lewat Orca, dan urutan pilihan model bila head memilih model per task (`references/orca.md`).
    - **Model dan effort per jenis sesi** (saran awal, dikonfirmasi user): head (BOOTSTRAP, AUDIT, triase, SPIKE) memakai model terkuat dengan effort high; pekerjaan mekanis tanpa keputusan (ekspor, menjalankan alat) memakai model lebih murah dengan effort medium; executor mengikuti §Kapasitas Executor. Sesi yang dibuka dari sesi lain bisa mewarisi setelan sesi asalnya, jadi cek model dan effort setiap sesi baru begitu dibuka.
 2. Operasi yang tidak boleh dilakukan agen tanpa izin eksplisit, misalnya deploy produksi, migrasi DB, flash hardware, upload/OTA, menghapus data, mengirim pesan ke orang lain, atau mengeluarkan biaya.
 3. Dokumen arah yang berlaku dan prioritas 1–2 bulan ke depan.
@@ -162,6 +166,7 @@ handoff/
 - **Alat cek bukti.** Salin `scripts/cek_bukti.py` dan `scripts/catat.py` ke `handoff/tools/` untuk setiap project yang punya executor. Format bukti yang dicek ada di REPORT_TEMPLATE (T6). Executor menyimpan output bukti lewat `catat.py` (asal log tercatat di `handoff/logs/asal.jsonl`) dan menjalankan `cek_bukti.py` sebelum DONE; head menjalankannya lagi saat triase. Kedua skrip ini juga tidak dihitung dalam batas 7 file.
 - **Perintah dicek jalan.** Setiap perintah yang ditulis ke protokol (build, test, alat di `handoff/tools/`, langkah penutup seperti `graphify update`) dijalankan sekali di mesin ini, dan yang ditulis adalah bentuk yang jalan. Perintah di file aturan agen buatan tool lain (mis. `.agents/rules/graphify.md`) ikut dicek; bila gagal, bentuk yang jalan ditambahkan sebagai catatan di file itu. Perintah yang tidak boleh dijalankan agen (flash, deploy, migrasi) ditandai `belum dicek`.
 - **Cek tampilan.** Project ber-UI: salin `scripts/foto_tampilan.py` ke `handoff/tools/`, tulis perintahnya beserta ukuran layar sasaran di README §Lingkungan (T3, baris **Cek tampilan**), lalu jalankan sekali dan lihat hasilnya. Halaman yang butuh server (mis. `vite preview`) atau perangkat ditulis dengan langkah menyalakannya; layanan live diblokir dengan `--luring`. Jangan memotret lebar HP dengan `chrome --headless --window-size` biasa: Chrome desktop menata halaman minimal ±500 px lalu memotong fotonya. Tanpa Chrome, Chromium, atau Edge, jadikan Tugas User: cek di perangkat nyata (`user:`).
+- **Executor lewat Orca.** Bila head menjalankan executor lewat Orca, ikuti `references/orca.md`. Profil Executor mencatat peluncuran Orca per model, setelan izin agen dipilih bersama user (bukan `Full access` bila project punya operasi berisiko), dan satu dispatch baca-saja dijalankan sebelum task pertama. Tanpa Orca, bagian **Executor lewat Orca** (T1) dan **Dijalankan lewat Orca** (T2a/T2b) dihapus.
 
 **Lokasi instruksi per tool**
 
@@ -232,6 +237,7 @@ Diagnosis dulu, ubah setelah disetujui.
 - [ ] Penegakan per tool (`references/penegakan.md`)
 - [ ] Header `Butuh executor` di task OPEN
 - [ ] Prompt pembuka, `CLAUDE.md`/rule, dan memori tool
+- [ ] Bila memakai Orca: peluncuran per model di Profil Executor, setelan izin agen, dan dispatch baca-saja (`references/orca.md`)
 
 **Jalur upgrade.** Dipakai bila user hanya meminta upgrade, atau bila versi efektif project lebih lama dari versi skill ini.
 1. Jalankan `python <folder skill>/scripts/cek_versi.py` dari root project. Bila lebih dari dua penanda dasar (v2.1) hilang, lakukan audit penuh, bukan upgrade per baris.
@@ -301,7 +307,8 @@ Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rek
 - **Turun satu tingkat** bila ada **OK palsu**, yaitu status OK yang buktinya tidak ada, bertentangan dengan nilai harapan, atau dikarang (kutipan yang tidak ada di file log, baris log yang bukan output perintah, pengamatan user yang tidak pernah diberikan user), atau bila pagar pengaman dilanggar. Klaim penyebab sebagai fakta, angka tanpa pengukuran, dan Batasan task yang dilanggar tanpa dilaporkan dicatat sebagai **Kebiasaan gagal**, dan task itu tidak dihitung untuk naik. Kapasitas tidak diturunkan karenanya, karena di SEDANG/RENDAH head memverifikasi setiap status.
 - **Saat kapasitas berubah**, perbarui header `Butuh executor` di task OPEN, dan tulis ulang task yang formatnya tidak lagi cocok. Catat perubahannya di README §Profil Executor dan di register keputusan.
 - Task yang butuh desain bebas atau eksplorasi diberi header `Butuh executor: TINGGI`. Task itu dikerjakan model kuat atau head sendiri.
-- **Satu tool, beberapa model.** Bila user berganti model per task (mis. Antigravity dengan Opus dan Gemini Flash), kapasitas dinilai **per model**. Profil Executor berisi satu baris per model, header `Butuh executor` menentukan model yang boleh dipakai, dan naik/turun dicatat per model. Nama model dan effort diambil dari prompt pembuka user (T7), bukan tebakan executor.
+- **Satu tool, beberapa model.** Bila user berganti model per task (mis. Antigravity dengan Opus dan Gemini Flash), atau model executor tersebar di beberapa tool, kapasitas dinilai **per model**. Profil Executor berisi satu baris per model beserta tool-nya, header `Butuh executor` menentukan model yang boleh dipakai, dan naik/turun dicatat per model. Nama model dan effort diambil dari prompt pembuka (T7), bukan tebakan executor.
+- **Pilihan model per task.** Head memilih model untuk setiap task: yang termurah dengan kapasitas cukup, mengikuti urutan pilihan user di Profil Executor, kecuali model itu punya Kebiasaan gagal yang mengenai task tersebut. Alasannya ditulis di header task. Model yang belum punya kapasitas tercatat di Profil Executor tidak menerima task sampai kapasitas awalnya ditetapkan, biasanya lewat kalibrasi.
 - **Task yang dikerjakan sesi head** (atas permintaan user) dicatat `sesi head · <model> (<effort>)` dari setelan sesi, bukan dari header task, dan tidak dihitung sebagai bukti kapasitas executor. Task yang pendek dan murah lebih baik dibuka di sesi baru dengan model sesuai header.
 - **Kebiasaan gagal per model.** Kegagalan yang khas untuk satu model (mis. menulis OK tanpa mencocokkan log) dicatat di Profil Executor beserta penangkalnya, dan head menuliskan penangkal itu di setiap task untuk model tersebut. Dengan begitu model tetap bisa dipakai dengan pagar yang tepat, tidak hanya diturunkan kapasitasnya. Hanya OK palsu dan pelanggaran pagar pengaman yang menurunkan kapasitas (**Turun satu tingkat**).
 - Untuk SEDANG/RENDAH, head yang mendesain. Biaya token head jadi naik; itu harga dari executor yang murah. Jangan biarkan head kembali pasif. Kurangi biaya itu dengan memindahkan ke executor apa yang bisa diverifikasi murah: bacaan luas lewat task FAKTA, dan pemeriksaan lewat **Periksa diri** sebelum DONE. Token executor yang murah paling berguna untuk membaca dan memeriksa.
@@ -316,12 +323,12 @@ Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rek
 - **Standar struktur** per jenis project, survei, aturan log bukti, dan cara memindah file ada di `references/struktur.md`. Baca file itu saat BOOTSTRAP, AUDIT, dan mode STRUKTUR.
 - **Alat cek secret** generik ada di `scripts/cek_secret.py`. Cara memasangnya ada di §3.
 - **Changelog dan cek versi** (`references/changelog.md` + `scripts/cek_versi.py`) dipakai jalur upgrade di §4.
-- **Resep penegakan per tool** ada di `references/penegakan.md`: Claude Code `permissions`, Antigravity, Cline, dan hook git. Tawarkan ke user; pasang hanya setelah disetujui.
+- **Resep penegakan per tool** ada di `references/penegakan.md`: Claude Code `permissions`, Antigravity, setelan izin agen di Orca, Cline, dan hook git. Tawarkan ke user; pasang hanya setelah disetujui.
 
 ## Batasan Skill Ini
 - **Instruksi, bukan penegakan.** Untuk operasi kritis, tawarkan penegakan nyata (`references/penegakan.md`). Jangan mengubah setelan tanpa izin.
 - **Kemampuan model murah dan AI lokal sangat bervariasi.** Kalibrasi dulu, mulai dari task kecil, lalu naikkan setelah terbukti.
-- **Konvensi folder tiap tool dan standar struktur file berubah antar versi tool.** Cek dokumentasi tool bila ragu; label WAJIB harus bersumber dokumentasi versi yang dipakai project.
+- **Konvensi folder tiap tool dan standar struktur file berubah antar versi tool.** Cek dokumentasi tool bila ragu; label WAJIB harus bersumber dokumentasi versi yang dipakai project. Perintah Orca juga berubah: `references/orca.md` ditulis untuk Orca 1.4.243, dan panduan yang cocok dengan versi terpasang dicetak `orca skills get orchestration`.
 - **Hasil hanya sebaik bahannya.** Tanpa dokumen arah atau jawaban user, ROADMAP awal akan tipis. Tulis sebagai Pertanyaan Terbuka, jangan mengarang.
 - **Skill yang dihasilkan tidak memperbarui dirinya sendiri.** Jalankan mode AUDIT secara berkala, saat project terasa macet, atau saat skill ini naik versi. Jalur upgrade (§4) memasang aturan baru sebagai patch minimal.
 - **Untuk dipakai di tool lain**, lampirkan `SKILL.md` beserta folder `references/` dan `scripts/`.

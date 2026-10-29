@@ -1,7 +1,7 @@
 {
   "name": "agent-workflow",
   "displayName": "Agent Workflow (head + executor)",
-  "version": "3.10.2",
+  "version": "3.11.0",
   "description": "Set up or audit a two-agent development workflow: a head (planner) on a strong model and an executor on a cheaper or local model, talking through files in the repo. Generates project-specific role skills, a handoff folder (tasks, reports, NOTES, ROADMAP), capacity-tuned task formats, and scripts that check report evidence, log provenance, and leaked secrets. Skill text is in Indonesian; generated files follow the user's language.",
   "author": {
     "name": "Abraham.r",

@@ -6,7 +6,7 @@ Dibaca dari `SKILL.md` saat BOOTSTRAP/LITE, dan saat AUDIT/STRUKTUR bila butuh s
 - `{{PROJECT}}`, `{{prefix}}`, `{{RINGKASAN}}` (satu kalimat).
 - `{{BUILD}}`, `{{TEST}}`, `{{RUN}}` (diambil dari repo).
 - `{{LINGKUNGAN}}`: hardware/port, server, data uji (tanpa nilai rahasia).
-- `{{TOOL_EXECUTOR}}`, `{{MODEL_EXECUTOR}}`, `{{KAPASITAS}}`.
+- `{{TOOL_EXECUTOR}}`, `{{MODEL_EXECUTOR}}`, `{{KAPASITAS}}`. Bila model executor tersebar di beberapa tool (mis. Antigravity dan Claude Code), baris `Tool:` di Profil Executor menyebut semuanya, karena `cek_versi.py` memeriksa folder skill setiap tool yang tertulis di sana.
 - `{{TOOL_HEAD}}`, `{{MODEL_HEAD}}`: tool dan model (+ effort) sesi head, mis. `Claude Code` dan `Claude Opus (high)`. Nama tool ditulis persis (`Claude Code`, `Antigravity`), karena `cek_versi.py` mencocokkannya dengan folder skill tool itu.
 - `{{PATH_HEAD}}`, `{{PATH_EXECUTOR}}`: lokasi kanonis instruksi tiap peran.
 - `{{COMMIT}}`: konvensi commit.
@@ -89,6 +89,7 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
    - SEDANG → sketsa desain, ditambah **test acceptance yang bisa dijalankan** untuk FIX/FEATURE (test, skrip, atau penganalisis log). Jalankan dulu sendiri supaya nilai harapannya benar. Bila hasilnya hanya bisa dinilai dengan mata user, tulis cara ceknya dan tandai `user:` di kriteria itu. Bila sketsa menyangkut perilaku yang sulit diduga (siklus hidup komponen, riwayat navigasi, konkurensi, urutan event), uji dulu sebagai implementasi rujukan di worktree terpisah sebelum menulis task; jebakan desain lebih murah ditemukan di sini daripada lewat satu siklus koreksi. <!-- aw: F1 F3 -->
    - **Task tampilan:** kriteria tampilan ditulis bisa dicek: rujukan rancangan atau mockup (file + bagian), ukuran layar sasaran, dan apa yang harus terlihat. Yang terukur (ukuran elemen, posisi, tidak keluar layar, tanpa gulir mendatar) dinilai skrip audit peramban seperti test acceptance, mis. `foto_tampilan.py` exit 0: halaman tidak lebih lebar dari layar dan 0 elemen keluar layar. Yang butuh mata (kesesuaian dengan mockup) ditandai `head:` (kamu yang menilai saat triase) atau `user:`. <!-- aw: I1 -->
    - Task yang butuh desain bebas → `Butuh executor: TINGGI`.
+   - **Pilihan model per task.** Pilih model dari README §Profil Executor: yang termurah dengan kapasitas cukup untuk `Butuh executor`, mengikuti **Urutan pilihan model** user, kecuali model itu punya Kebiasaan gagal yang mengenai task ini. Tulis model beserta alasannya di header task (`Model:`). Model yang kapasitasnya belum ditetapkan tidak menerima task sampai kapasitas awalnya ditetapkan, biasanya lewat uji kalibrasi skill agent-workflow. <!-- aw: M5 -->
    - **Bacaan luas didelegasikan.** Sebelum membaca kode, docs, atau log dalam jumlah besar untuk sebuah keputusan, tulis task FAKTA: pertanyaan yang jawabannya bisa ditunjuk dengan `file:baris` atau `hitung(lingkup, "pola")`. Baca tabel jawaban dan kutipannya, lalu buka file aslinya hanya untuk bagian yang menentukan keputusan. Untuk executor RENDAH, setiap pertanyaan disertai perintah pencarian persis.
    - Rujukan kode ditulis sebagai fungsi + `file:baris`. Kriteria terima diberi nomor K1, K2, …, supaya `cek_bukti.py` bisa memeriksa bahwa setiap kriteria punya baris di tabel Data report.
    - Prasyarat ditulis `TASK-NNN lolos triase head`. Task yang memegang port, perangkat, atau layanan bersama diberi header `Memakai: <sumber daya> (eksklusif, ±durasi)`.
@@ -111,6 +112,16 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
    - Keputusan yang syarat buka-ulangnya sudah terpenuhi.
    - Rangkum NOTES.
    - Jadwalkan SMOKE.
+
+## Executor lewat Orca <!-- aw: D4 -->
+Bagian ini berlaku bila kamu menjalankan executor lewat Orca. Kamu koordinatornya. Mekanismenya mengikuti panduan Orca versi terpasang (`orca skills get orchestration`); aturan di bawah mengikatnya ke protokol ini.
+- **Satu Run per sesi head:** `orca orchestration run-create --objective "<tujuan sesi>" --json`; sesudah restart, `orca orchestration run-use --id <run>`.
+- **Satu task per dispatch:** `orca orchestration worker-start --spec "<prompt pembuka executor>" --worktree path:<root project> --agent <agen> --model <id model> --task-title "TASK-NNN" --json`, ditambah `--effort <effort>` untuk agen yang memakainya. Agen, id model, dan effort diambil dari baris model pilihanmu di README §Profil Executor. Spec mengikuti prompt pembuka executor (`handoff/PROMPT_EXECUTOR.md`, diawali `Model:` dengan nama persis baris itu). Pakai folder project ini, bukan worktree baru, karena Periksa Diri dan triase membaca `git status` folder ini. Karena itu hanya satu worker yang mengubah file boleh berjalan pada satu waktu; task FAKTA yang hanya membaca boleh berjalan bersamaan.
+- **Model dari bukti peluncuran.** Bandingkan `launch.effective` di receipt (atau di `orca orchestration worker-show --dispatch <id> --json`) dengan yang diminta. Bila berbeda atau kosong, Pelaksana report itu diganti dengan model efektif saat triase (atau `tidak diketahui`), dan task itu tidak dihitung sebagai bukti kapasitas model yang kamu pilih.
+- **Tunggu** dengan `orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json`. Bila alat shell-mu membatasi lama perintah (mis. Claude Code: maksimal 10 menit di latar depan), jalankan perintah itu di latar belakang, atau pakai `--timeout-ms` di bawah batas itu lalu ulangi. Timeout bukan kegagalan. Setiap batch pesan di-ack (`--ack <delivery_id>`) sesudah diproses; batch yang belum di-ack akan muncul lagi. Pertanyaan worker dijawab dengan `orca orchestration reply`. Permintaan izin untuk operasi berisiko diteruskan ke user; izin yang diberikan ditulis di task sebagai kutipan user, karena balasanmu sendiri bukan izin user. Worker yang menunggu persetujuan alat (di Orca tampil "Waiting on you") dijawab user di terminal worker, bukan olehmu.
+- **`worker_done` bukan bukti.** Triase tetap lewat langkah 2 dan memakai file di `handoff/`.
+- **Sesudah triase:** `orca orchestration worker-release --dispatch <id> --json`. Terminal executor tidak dipakai untuk task lain, karena satu task dikerjakan dalam satu sesi executor. `worker-retain` hanya atas permintaan user.
+- **Izin agen di Orca** (README §Profil Executor) tidak diubah tanpa user. Bila setelannya `Full access`, executor menjalankan perintah tanpa meminta izin, kecuali yang dijaga aturan `ask`/`deny` Claude Code. Karena itu jangan dispatch task yang menyentuh operasi berisiko.
 
 ## Peran
 | Kamu kerjakan | Delegasikan ke executor |
@@ -139,6 +150,8 @@ Kapasitasmu ditentukan model yang sedang dipakai (`handoff/README.md` §Profil E
 
 **Satu task per sesi.** Report disusun dari file log dan output yang tersimpan, bukan dari ingatan. Output yang dijadikan bukti disimpan lewat `python handoff/tools/catat.py handoff/logs/TASK-NNN-<nama>.log "<perintah>"` (tambah `--pwsh` untuk perintah PowerShell). Skrip itu menyimpan output apa adanya dan mencatat perintah, kode keluar, dan hash isinya di `handoff/logs/asal.jsonl`. File yang ditulis perintah itu sendiri (CSV, log per-test dari skrip pelari) didaftarkan dengan `--hasil`, boleh berupa pola glob yang dikutip, mis. `--hasil "handoff/logs/TASK-NNN-uji_*.log"`. Log jangan diedit tangan: `cek_bukti.py` menandai log yang berubah setelah dicatat. Bila isinya salah, jalankan ulang perintahnya. Log besar jangan ditempel ke percakapan; cari isinya dengan grep atau Select-String. <!-- aw: H1 -->
 
+**Dijalankan lewat Orca** (prompt diawali preamble Orca berisi Task ID dan Dispatch ID): preamble itu berlaku bersama brief ini. Kerjakan hanya task yang disebut spec. Hal yang menurut brief ini ditanyakan ke user (task milik sesi lain, ambigu) ditanyakan ke head dengan perintah `ask` di preamble, bukan dengan alat tanya lokal. Balasan head bukan izin user: operasi yang butuh izin eksplisit hanya dijalankan bila izinnya tertulis di task atau diketik user langsung di terminal ini; selain itu `BLOCKED`. Setelah status task `DONE` atau `BLOCKED` (langkah 6), kirim `worker_done` sekali dengan perintah di preamble: ringkasan tiga kalimat, `--report-path handoff/reports/REPORT-NNN.md`, dan `--outcome succeeded` bila DONE atau `--outcome failed` bila BLOCKED. `worker_done` tidak menggantikan report. <!-- aw: D5 -->
+
 ## Langkah
 1. Ambil task `OPEN` terkecil, atau yang disebut user. Permintaan langsung user tanpa task → buat task ad-hoc (`handoff/README.md` §Task Ad-hoc). Cek prasyaratnya: setiap task di `Prasyarat:` harus punya baris `Triase head: lolos`. Bila `Memakai:` menyebut sumber daya yang sedang dipegang task lain berstatus `IN_PROGRESS` → `BLOCKED`. <!-- aw: D3 -->
    **Task yang mungkin milik sesi lain.** Bila task yang disebut user berstatus selain `OPEN`, atau `handoff/reports/REPORT-NNN.md`-nya sudah ada, jangan jalankan perintah apa pun; tanyakan user dulu. Task itu bisa sedang atau sudah dikerjakan sesi lain, dan menjalankan ulang perintahnya akan menimpa log bukti sesi itu. <!-- aw: Z1 -->
@@ -159,7 +172,7 @@ Kapasitasmu ditentukan model yang sedang dipakai (`handoff/README.md` §Profil E
    - Bukti `user:` hanya berisi kata-kata user yang benar-benar diucapkan di sesi ini. Bila user belum mencoba, tulis TIDAK DIUJI sampai user menjawab; jangan menyalin teks kriteria sebagai kutipan. <!-- aw: Y3 -->
    - **Task tampilan:** simpan tangkapan layar setiap layar yang diubah di ukuran layar sasaran dengan perintah **Cek tampilan** di README §Lingkungan (`foto_tampilan.py`, prefix `handoff/logs/TASK-NNN-<layar>`), lalu sebut path-nya dan output ukurannya di report. Kriteria bertanda `head:` ditulis TIDAK DIUJI dengan path tangkapan layar di kolom Bukti, karena head yang menilainya. Jangan menulis "sesuai mockup" sebagai fakta. <!-- aw: I2 -->
    - Angka di Ringkasan Fakta, Keputusan Implementasi, dan Anomali berasal dari output perintah atau file (rujuk `file:baris`). Perkiraan ditulis sebagai `HIPOTESIS:` atau perkiraan.
-   - Isi `Pelaksana (model)` dengan nama model **persis** beserta effort-nya bila ada (mis. `<model> (high)`), dari prompt pembuka user atau pemilih model di tool. Bila tidak ada, tulis `tidak diketahui`. Jangan menebak dari pengetahuanmu sendiri, dan jangan menulis nama peran atau tool saja. <!-- aw: M2 E2 -->
+   - Isi `Pelaksana (model)` dengan nama model **persis** beserta effort-nya bila ada (mis. `<model> (high)`), dari baris `Model:` di prompt pembuka (dari user, atau dari spec head lewat Orca) atau dari pemilih model di tool. Bila tidak ada, tulis `tidak diketahui`. Jangan menebak dari pengetahuanmu sendiri, dan jangan menulis nama peran atau tool saja. <!-- aw: M2 E2 -->
    - Kutipan log disalin dari file log yang disimpan di `handoff/logs/`; sebutkan path-nya. Sebelum commit, jalankan `python handoff/tools/cek_secret.py <file-log> --redact`. Skrip itu mengganti pola secret dan nilai dari file secret lokal dengan `<REDACTED>`, lalu mencatat penyamaran itu di `handoff/logs/asal.jsonl` untuk log dari `catat.py`, sehingga log tersebut tetap lolos `cek_bukti.py`. Log > ±10 MB disimpan sesuai aturan log di `handoff/STRUKTUR.md`. <!-- aw: C3 -->
    - Sertakan fakta, keputusan implementasi, output perintah utama, dan **Hipotesis & Usulan** (label `HIPOTESIS:` / `USULAN:`).
 5. **Periksa diri sebelum DONE.** Langkah ini boleh memakan waktu dan token; ketelitian di sini lebih murah daripada satu siklus koreksi. <!-- aw: W1 -->
@@ -170,7 +183,7 @@ Kapasitasmu ditentukan model yang sedang dipakai (`handoff/README.md` §Profil E
    - Cocokkan setiap angka di Ringkasan Fakta dengan tabel Data.
 
    Bila ada yang salah, perbaiki lalu ulangi dari awal. Catat hasilnya di bagian Periksa Diri report.
-6. Ubah status menjadi `DONE`, atau `BLOCKED` beserta alasannya. Jalankan Langkah Penutup bila ada.
+6. Ubah status menjadi `DONE`, atau `BLOCKED` beserta alasannya. Jalankan Langkah Penutup bila ada. Lewat Orca, kirim `worker_done` sesudahnya (paragraf **Dijalankan lewat Orca**).
 
 ## Pagar Pengaman (sumber tunggal)
 | Boleh | DILARANG tanpa izin eksplisit |
@@ -210,7 +223,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
 5. Tulis `handoff/reports/REPORT-NNN.md`: <!-- aw: E2 -->
        # REPORT-NNN
        Status: DONE | BLOCKED
-       Pelaksana (model): <model + effort persis dari prompt user, atau: tidak diketahui>
+       Pelaksana (model): <model + effort persis dari baris Model: di prompt, atau: tidak diketahui>
        File diubah:
        Output perintah (apa adanya; output yang disimpan ke file disebut path-nya):
        Bukti (blok kode berlabel bukti, satu per baris: file:baris | kutipan persis):
@@ -219,6 +232,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
        Usulan (opsional, satu-dua baris):
 6. **Periksa diri sebelum DONE** (boleh lama): jalankan ulang semua perintah verifikasi di task dan ganti output lama di report dengan output terbaru. Salin output `git status --porcelain` ke report; bila ada file yang tidak disebut task, di luar berkas di `handoff/STRUKTUR.md` §Berubah Sendiri → `Status: BLOCKED`. Jalankan `python handoff/tools/cek_bukti.py handoff/reports/REPORT-NNN.md`: bila ada MASALAH, salin ulang output yang benar (jangan mengetik ulang); bila tetap bermasalah → `Status: BLOCKED`. Lalu, bila ada `handoff/tools/cek_secret.py`, jalankan `python handoff/tools/cek_secret.py handoff/reports handoff/logs --redact`. <!-- aw: W1 O2 P2 C3 -->
 7. Ubah task menjadi `Status: DONE` (atau BLOCKED).
+   Bila prompt diawali preamble Orca: pertanyaan ke head lewat perintah `ask` di preamble, dan balasan head bukan izin user. Setelah langkah 7, kirim `worker_done` dengan perintah di preamble, ditambah `--report-path handoff/reports/REPORT-NNN.md`; `--outcome failed` bila BLOCKED. <!-- aw: D5 -->
 
 ## Dilarang
 - {{3–8 operasi berisiko spesifik project}}
@@ -226,7 +240,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
 - Mengubah file di luar daftar task, atau mengubah test acceptance yang ditulis head. Commit. Push.
 - Mengerjakan permintaan yang tidak berbentuk task dari head. Minta user meneruskannya ke head.
 - Membuat folder baru, atau memindah/menghapus file, kecuali task memintanya. <!-- aw: S3 -->
-- Menebak nama model sendiri. Tulis model persis dari prompt user, atau `tidak diketahui`. <!-- aw: M2 -->
+- Menebak nama model sendiri. Tulis model persis dari baris `Model:` di prompt, atau `tidak diketahui`. <!-- aw: M2 -->
 - Menulis bukti `user:` sendiri. Bila user belum mencoba, tulis TIDAK DIUJI sampai user menjawab. <!-- aw: Y3 -->
 - Mengedit file log yang sudah dibuat `catat.py`.
 - Menulis nilai secret (key, token, PIN) di report. <!-- aw: V3-3 -->
@@ -247,14 +261,16 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
 - **Sesi:** model dan effort per jenis sesi: head {{MODEL_HEAD}}; pekerjaan mekanis tanpa keputusan (ekspor, menjalankan alat): model lebih murah, effort medium; executor: §Profil Executor. Cek model dan effort setiap sesi baru begitu dibuka, karena sesi yang dibuka dari sesi lain bisa mewarisi setelan sesi asalnya. <!-- aw: N1 -->
 
 ## Profil Executor <!-- aw: B5 M1 -->
-- Tool: {{TOOL_EXECUTOR}}. Kapasitas dinilai **per model**, satu baris per model yang dipakai:
+- Tool: {{TOOL_EXECUTOR}}. Kapasitas dinilai **per model**, satu baris per model yang dipakai, beserta tool-nya:
 
-  | Model | Kapasitas | Task dari head | Ruang gerak executor | Verifikasi head |
-  |---|---|---|---|---|
-  | {{MODEL_EXECUTOR}} | **{{KAPASITAS}}** | {{baris yang relevan dari tabel kapasitas}} | {{...}} | {{...}} |
+  | Model | Tool | Kapasitas | Task dari head | Ruang gerak executor | Verifikasi head | Peluncuran Orca |
+  |---|---|---|---|---|---|---|
+  | {{MODEL_EXECUTOR}} | {{TOOL_EXECUTOR}} | **{{KAPASITAS}}** | {{baris yang relevan dari tabel kapasitas}} | {{...}} | {{...}} | {{bila memakai Orca: `--agent <agen> --model <id model>`, + `--effort` bila agennya memakai}} |
 
+- **Urutan pilihan model** (keputusan user; dipakai head untuk **Pilihan model per task**): {{mis. 1. model utama; 2. model lain di tool yang sama, sesuai kapasitasnya; 3. model kuat untuk task di atas kapasitas model utama}}. Model yang kapasitasnya belum ditetapkan tidak menerima task. <!-- aw: M6 -->
+- **Orca** (bila head menjalankan executor lewat Orca): id model di kolom Peluncuran Orca diambil dari daftar model agen itu (mis. `agy models` untuk Antigravity). Izin agen di Orca (Settings → Agents): {{setelan per agen}}. `Full access` meluncurkan agen dengan flag yang melewati prompt izinnya (Claude Code hanya menyisakan aturan `ask`/`deny`), jadi tidak dipakai bila project punya operasi berisiko. Dispatch baca-saja sudah dicek jalan ({{tanggal}}). <!-- aw: D6 -->
 - Header task `Butuh executor: <kapasitas>` menentukan model yang boleh dipakai. Executor yang menerima task di atas kapasitas modelnya → `BLOCKED` ("butuh executor lebih kuat").
-- Report wajib mengisi `Pelaksana (model)` dengan nama model dan effort persis dari baris `Model:` di prompt pembuka user. Bila tidak ada, tulis `tidak diketahui`. Task yang dikerjakan sesi head dicatat `sesi head · <model> (<effort>)` dan tidak dihitung sebagai bukti kapasitas.
+- Report wajib mengisi `Pelaksana (model)` dengan nama model dan effort persis dari baris `Model:` di prompt pembuka (dari user, atau spec head lewat Orca). Bila tidak ada, tulis `tidak diketahui`. Task yang dikerjakan sesi head dicatat `sesi head · <model> (<effort>)` dan tidak dihitung sebagai bukti kapasitas.
 - **Model baru** tanpa riwayat di project diuji kalibrasi dulu lewat skill agent-workflow (±15 menit: perintah persis, cari dan kutip bukti sendiri, tabel jika–maka dengan jebakan). Hasilnya dicatat di Riwayat kapasitas. <!-- aw: A1 -->
 - **Syarat naik RENDAH → SEDANG** (per model): 2 task berturut-turut tanpa koreksi, minimal 1 berformat SEDANG (tujuan, kriteria, sketsa; tanpa langkah atomik). Task atomik dan uji kalibrasi tidak dihitung. <!-- aw: E3 -->
 - **Syarat naik SEDANG → TINGGI** (per model): {{bukti berformat kapasitas target, mis. 1 FIX tanpa sketsa rinci + 1 SMOKE berbukti log, lolos tanpa koreksi}}. <!-- aw: V3-4 -->
@@ -286,7 +302,7 @@ Kamu mengerjakan SATU task dari `handoff/tasks/` persis seperti tertulis. Jangan
 
 ## Format Task <!-- aw: V3-5 D2 Y4 -->
     # TASK-NNN: <judul>
-    - Jenis · Roadmap: R<n> · Anggaran: <N>/3 · Status · Butuh executor: <kapasitas> · Model: <model (effort)>
+    - Jenis · Roadmap: R<n> · Anggaran: <N>/3 · Status · Butuh executor: <kapasitas> · Model: <model (effort)>, alasan: <satu kalimat>
     - Prasyarat: TASK-NNN lolos triase head · Memakai: <port/perangkat/layanan bersama> (eksklusif, ±durasi; bila ada)
     - Triase head: (diisi head setelah verifikasi: lolos <tanggal> / koreksi → TASK-NNN)
     ## Tujuan
@@ -382,7 +398,7 @@ Jenis: MEASURE / FIX / FEATURE / SPIKE / SMOKE / STRUKTUR / FAKTA. Status: BELUM
 ### T6 — `handoff/reports/REPORT_TEMPLATE.md`
 ~~~markdown
 # REPORT-NNN: <judul task>
-- Task: TASK-NNN · Jenis · Pelaksana: tool + model + effort persis dari prompt user (`tidak diketahui` bila tidak ada; sesi head: `sesi head · <model> (<effort>)`) · Mulai/Selesai · Status akhir: DONE | BLOCKED
+- Task: TASK-NNN · Jenis · Pelaksana: tool + model + effort persis dari baris `Model:` di prompt pembuka (`tidak diketahui` bila tidak ada; sesi head: `sesi head · <model> (<effort>)`) · Mulai/Selesai · Status akhir: DONE | BLOCKED
 
 ## Ringkasan Fakta
 (3–6 poin: angka, waktu, kutipan.)
@@ -412,7 +428,7 @@ handoff/logs/<file>.log:<baris> | <kutipan persis>
 ~~~
 
 ### T7 — Prompt Pembuka & Penunjuk
-- `handoff/PROMPT_HEAD.md`: `Kamu adalah head agent {{PROJECT}}. Baca {{PATH_HEAD}}, lalu ikuti langkah-langkahnya.` Untuk executor, ganti peran dan path-nya, dan awali dengan nama model yang dipilih user: `handoff/PROMPT_EXECUTOR.md`: `Model: <nama model persis + effort di {{TOOL_EXECUTOR}}>. Kamu adalah executor {{PROJECT}}. Baca {{PATH_EXECUTOR}}, lalu kerjakan <TASK-NNN>.` File ini diakhiri tag `<!-- aw: M3 -->`.
+- `handoff/PROMPT_HEAD.md`: `Kamu adalah head agent {{PROJECT}}. Baca {{PATH_HEAD}}, lalu ikuti langkah-langkahnya.` Untuk executor, ganti peran dan path-nya, dan awali dengan nama model yang dipilih user: `handoff/PROMPT_EXECUTOR.md`: `Model: <nama model persis + effort di {{TOOL_EXECUTOR}}>. Kamu adalah executor {{PROJECT}}. Baca {{PATH_EXECUTOR}}, lalu kerjakan <TASK-NNN>.` File ini diakhiri tag `<!-- aw: M3 -->`. Bila head menjalankan executor lewat Orca, prompt yang sama menjadi `--spec` dispatch, dengan nama model dari baris Profil Executor yang dipilih head.
 - Penunjuk di tool kedua berisi frontmatter/judul yang sama, ditambah satu baris: `Baca dan ikuti {{PATH_...}}. File itu sumber tunggal instruksi peran ini.`
 - Rule atau `CLAUDE.md` (opsional, netral peran): `Head: {{PATH_HEAD}}. Executor: {{PATH_EXECUTOR}}. Di luar sesi head/executor, jangan mengedit handoff/NOTES.md atau handoff/ROADMAP.md kecuali diminta user. File baru mengikuti handoff/STRUKTUR.md.`
 

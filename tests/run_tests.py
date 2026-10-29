@@ -25,6 +25,7 @@ UJI = [
     ("test_redact_asal", [S]),
     ("test_kalibrasi", [S]),
     ("test_foto_tampilan", [S]),  # dilewati bila Chrome, Chromium, atau Edge tidak ada
+    ("test_orca_cli", [S]),  # dilewati bila Orca tidak terpasang
 ]
 gagal = []
 for nama, args in UJI:
