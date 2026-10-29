@@ -134,6 +134,27 @@ try:
             "api.telegram.org/bot<REDACTED>/getUpdates" in isi and isi.count("<REDACTED>") == 2 and f"abc7123456789:{TG}" in isi, isi)
     else:
         print("LEWAT T8: skrip ini belum punya pola token bot Telegram (sebelum v3.9.1)")
+
+    # ---------- T9 dan T10 (v3.12.1): --staged dengan file yang berganti nama; status ignore di repo file secret ----------
+    if "--diff-filter=ACMR" in SKRIP.read_text(encoding="utf-8"):
+        r9 = repo_baru(tmp, "rename", {"lama.log": "".join(f"baris aman {i}\n" for i in range(12))}, "")
+        git(r9, "add", "lama.log", ".gitignore")
+        git(r9, "-c", "user.name=uji", "-c", "user.email=uji@example.com", "commit", "-q", "-m", "awal")
+        git(r9, "mv", "lama.log", "baru.log")
+        with open(r9 / "baru.log", "a", encoding="utf-8") as f:
+            f.write("kunci " + "sk_" + "live_abcdefghijklmnopqrstuvwx\n")
+        git(r9, "add", "baru.log")
+        code, out = jalankan(r9, "--staged")
+        cek("T9 --staged menangkap file yang berganti nama (status R)", code == 1 and "baru.log" in out, out)
+        sasaran = repo_baru(tmp, "sasaran", {"a.log": "aman\n"}, "")
+        lain = repo_baru(tmp, "lain", {".env": f'SECRET_KEY="{SKEY}"\n'}, ".env\n")
+        code, out = jalankan(sasaran, "a.log", "--secret-file", str(lain / ".env"))
+        cek("T10 file secret yang di-ignore di repo lain tidak diperingatkan", code == 0 and "TIDAK di-ignore" not in out, out)
+        lain2 = repo_baru(tmp, "lain2", {".env": f'SECRET_KEY="{SKEY}"\n'}, "")
+        code, out = jalankan(sasaran, "a.log", "--secret-file", str(lain2 / ".env"))
+        cek("T10 file secret yang tidak di-ignore di repo lain tetap diperingatkan", "TIDAK di-ignore" in out, out)
+    else:
+        print("LEWAT T9/T10: skrip sebelum v3.12.1")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

@@ -471,9 +471,9 @@ def main():
     n.add_argument("--seed", type=int, help="bila tidak diberikan, dibaca dari file seed yang disimpan `create`")
     n.add_argument("--dir", default=DIR_DEFAULT)
     g = n.add_mutually_exclusive_group()
-    g.add_argument("--archive", dest="arsip", help=f"file arsip hasil (default: {ARSIP_DEFAULT}/calibration-<tanggal>.txt)")
+    g.add_argument("--archive", dest="arsip", metavar="FILE", help=f"file arsip hasil (default: {ARSIP_DEFAULT}/calibration-<tanggal>.txt)")
     g.add_argument("--no-archive", dest="tanpa_arsip", action="store_true", help="jangan menulis arsip")
-    n.add_argument("--from-archive", dest="dari_arsip", help="ulangi skor dari file arsip, tanpa membaca folder pack")
+    n.add_argument("--from-archive", dest="dari_arsip", metavar="FILE", help="ulangi skor dari file arsip, tanpa membaca folder pack")
     # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.
     b.add_argument("--ganti", dest="ganti", action="store_true", help=argparse.SUPPRESS)
     g.add_argument("--arsip", dest="arsip", help=argparse.SUPPRESS)

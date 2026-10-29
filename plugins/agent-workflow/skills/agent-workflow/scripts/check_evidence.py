@@ -82,6 +82,17 @@ EKSTENSI_SET = set(EKSTENSI.split("|"))
 ABAIKAN = {".git", ".pio", "node_modules", ".venv", "venv", "__pycache__", "build", "dist"}
 ASAL = Path("handoff") / "logs" / "provenance.jsonl"
 ASAL_LAMA = Path("handoff") / "logs" / "asal.jsonl"  # nama sebelum v3.12
+# Nama sebelum v3.12 -> (nama baru, isinya sama). Report lama yang mengutip file yang hanya berganti nama dibaca dari
+# nama barunya, karena nomor barisnya tetap berlaku. Salinan alat isinya berubah, jadi hanya nama barunya yang disebut.
+NAMA_V312 = {
+    "handoff/logs/asal.jsonl": ("handoff/logs/provenance.jsonl", True),
+    "handoff/struktur.md": ("handoff/STRUCTURE.md", True),
+    "docs/struktur.md": ("docs/STRUCTURE.md", True),
+    "handoff/tools/cek_bukti.py": ("handoff/tools/check_evidence.py", False),
+    "handoff/tools/catat.py": ("handoff/tools/record.py", False),
+    "handoff/tools/cek_secret.py": ("handoff/tools/check_secrets.py", False),
+    "handoff/tools/foto_tampilan.py": ("handoff/tools/screenshot.py", False),
+}
 BAGIAN_ANGKA = re.compile(r"ringkasan fakta|keputusan implementasi|anomali|fact summary|implementation decision|anomal(?:y|ies)", re.I)
 ANGKA_SATUAN = re.compile(r"(?<![\w.,/-])\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?\s*"
                           r"(?:ms|s|secs?|detik|menit|mins?|jam|hours?|%|MB|KB|GB|kg|°C|mA|V|Hz|dB|:1)(?![\w])", re.I)
@@ -318,6 +329,12 @@ class Berkas:
                 return cocok[0], None
             if len(cocok) > 1:
                 return None, f"nama file {nama} ambigu ({len(cocok)} file di handoff/logs/); tulis path lengkapnya"
+        pindah = NAMA_V312.get(("handoff/logs/" + nama if "/" not in nama else self.rel(p) or "").lower())
+        if pindah:
+            baru, isi_sama = pindah
+            if isi_sama and self.ada(self.root / baru):
+                return self.root / baru, None
+            return None, f"file {nama} tidak ada (sejak v3.12 bernama {baru}; report lama dicek dengan --at-report)"
         return None, f"file {nama} tidak ada" + (" (log mentah hanya ada di mesin lokal?)" if "raw" in nama else "")
 
     def baris(self, path):

@@ -206,7 +206,7 @@ try:
     r2 = jalan(["nilai", "--dari-arsip", str(ar[0]), "--seed", "888"], lama) if ar else None
     cek(r2 is not None and r2.returncode == 0 and saran(r2.stdout) == "SEDANG", "opsi lama --dari-arsip mengulang skor dari arsip")
     bantuan = jalan(["create", "--help"], lama).stdout + jalan(["grade", "--help"], lama).stdout
-    cek("--replace" in bantuan and "--from-archive" in bantuan and not re.search(r"--(ganti|arsip|tanpa-arsip|dari-arsip)", bantuan),
+    cek("--replace" in bantuan and "--from-archive" in bantuan and not re.search(r"--(ganti|arsip|tanpa-arsip|dari-arsip)\b|ARSIP", bantuan),
         "--help hanya menampilkan nama opsi baru")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)

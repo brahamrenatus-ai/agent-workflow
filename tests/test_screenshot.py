@@ -59,7 +59,7 @@ if "--sizes" in SKRIP.read_text(encoding="utf-8"):  # v3.12: nama opsi berbahasa
     cek(r.returncode == 2 and "bukan URL dan bukan file" in r.stderr, "opsi lama --ukuran, --luring, --tunggu diterima", r.stderr)
     bantuan = subprocess.run([sys.executable, "-X", "utf8", str(SKRIP), "--help"], capture_output=True, text=True,
                              encoding="utf-8").stdout
-    cek("--sizes" in bantuan and "page" in bantuan and not any(o in bantuan for o in ("--ukuran", "--luring", "--tunggu")),
+    cek("--sizes" in bantuan and "page" in bantuan and not any(o in bantuan for o in ("--ukuran", "--luring", "--tunggu", "UKURAN", "TUNGGU")),
         "--help hanya menampilkan nama opsi baru", bantuan)
 if not modul.cari_browser():
     print("LEWAT uji screenshot selebihnya: Chrome, Chromium, atau Edge tidak ada di mesin ini")

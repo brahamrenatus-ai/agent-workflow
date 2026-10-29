@@ -244,6 +244,20 @@ Perubahan lain tanpa penanda baru: jenis penanda `tiada~` di `scripts/check_vers
 | N10 | Brief executor memakai nama baru | brief executor | seperti N9 | – |
 | N11 | README handoff memakai nama baru | `handoff/README.md` | seperti N9, juga di REPORT_TEMPLATE dan file aturan agen (mis. `CLAUDE.md`, `AGENTS.md`, `.agents/rules/`) | – |
 
+## v3.12.1 (2026-10-29): perbaikan alat sesudah upgrade lapangan v3.12
+Berasal dari upgrade robot meja ke v3.12. Empat hal muncul di sana:
+- report lama yang mengutip `handoff/logs/asal.jsonl:80` gagal dicek di working tree karena file itu sudah berganti nama;
+- `check_secrets.py --staged` melewatkan file yang berganti nama (status R), sehingga file itu harus dipindai manual;
+- peringatan "TIDAK di-ignore git" muncul keliru untuk `--secret-file` dari repo lain, karena status ignore dicek di repo tempat skrip dijalankan;
+- `--help` beberapa skrip masih menampilkan placeholder berbahasa Indonesia (mis. `--result HASIL`).
+
+Perubahan lain tanpa penanda baru: placeholder `--help` berbahasa Inggris di `record.py`, `screenshot.py`, dan `calibrate.py`.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| N12 | Kutipan report lama ke `asal.jsonl` atau `STRUKTUR.md` dibaca dari nama barunya; kutipan ke salinan alat lama menyebut nama barunya | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py`, setelah dibandingkan dengan salinan project (tambalan lokal dipertahankan) | – |
+| N13 | `--staged` menyertakan file yang berganti nama; status ignore file secret dicek di repo file itu | `handoff/tools/check_secrets.py` | Salin ulang `scripts/check_secrets.py`, dengan `SECRET_FILES` project dipertahankan | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -349,4 +363,6 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.12 N9    head~check_evidence
 3.12 N10   executor~check_evidence
 3.12 N11   readme~check_evidence
+3.12.1 N12 file:handoff/tools/check_evidence.py~NAMA_V312
+3.12.1 N13 file:handoff/tools/check_secrets.py~--diff-filter=ACMR  @bila_secret
 ```

@@ -142,7 +142,7 @@ try:
             "project bernama lama: --tambah, --hasil, --timpa diterima; catatan tetap ditulis ke asal.jsonl",
             r2.stderr.decode(errors="replace") + isi_lama)
         bantuan = catat(lama, "--help").stdout.decode(errors="replace")
-        cek("--append" in bantuan and "command" in bantuan and not any(o in bantuan for o in ("--tambah", "--hasil", "--timpa")),
+        cek("--append" in bantuan and "command" in bantuan and not any(o in bantuan for o in ("--tambah", "--hasil", "--timpa", "HASIL")),
             "--help hanya menampilkan nama opsi baru", bantuan)
     else:
         print("LEWAT uji v3.12: record.py versi lama")

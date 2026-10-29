@@ -5,7 +5,7 @@ description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/p
 
 # Agent Workflow — Head + Executor untuk Project Apa Pun
 
-**Versi skill: 3.12.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
+**Versi skill: 3.12.1.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
 
 Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewat file di repo:
 - **Head** (perencana) menjaga arah, menganalisis hasil, memutuskan, mendesain, menulis task, dan memverifikasi.

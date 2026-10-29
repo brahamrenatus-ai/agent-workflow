@@ -100,11 +100,14 @@ def root_repo():
     return Path.cwd()
 
 
-def di_ignore(root, path):
+def di_ignore(path):
+    """False hanya bila git menyatakan file itu tidak di-ignore. Dicek dari folder file itu sendiri, supaya file secret
+    project lain (--secret-file) dinilai dengan repo-nya; file di luar repo git (exit 128) tidak bisa ter-commit."""
     try:
-        return subprocess.run(["git", "-C", str(root), "check-ignore", "-q", str(path)], capture_output=True).returncode == 0
+        r = subprocess.run(["git", "-C", str(path.parent), "check-ignore", "-q", path.name], capture_output=True)
     except OSError:
         return True
+    return r.returncode != 1
 
 
 def pasangan(path):
@@ -163,7 +166,7 @@ def sumber_secret(root, tambahan):
         if not p.is_file():
             print(f"PERINGATAN: file secret {p} tidak ada; dilewati.")
             continue
-        if not di_ignore(root, p):
+        if not di_ignore(p):
             print(f"PERINGATAN: {p} tampak seperti file secret tetapi TIDAK di-ignore git.")
         contoh = {v for c in file_contoh(p) for _, v in pasangan(c)}
         nilai = []
@@ -181,7 +184,7 @@ def sumber_secret(root, tambahan):
 def kumpulkan(root, paths, staged, lewati):
     calon = []
     if staged:
-        out = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        out = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
                              capture_output=True, text=True, encoding="utf-8").stdout
         calon += [root / p for p in out.splitlines() if p]
     for a in paths:
@@ -277,7 +280,7 @@ def periksa(path, values, redact, root):
 def main():
     ap = argparse.ArgumentParser(description="Cek secret di file tanpa mencetak nilainya.")
     ap.add_argument("paths", nargs="*", help="file, folder, atau pola glob")
-    ap.add_argument("--staged", action="store_true", help="cek file yang di-stage untuk commit")
+    ap.add_argument("--staged", action="store_true", help="cek file yang di-stage untuk commit, termasuk yang berganti nama")
     ap.add_argument("--redact", action="store_true", help="ganti temuan dengan <REDACTED> di file")
     ap.add_argument("--secret-file", action="append", default=[], help="file secret tambahan (bisa berulang)")
     ap.add_argument("--list-sources", action="store_true", help="tampilkan file secret yang terbaca, tanpa nilai")

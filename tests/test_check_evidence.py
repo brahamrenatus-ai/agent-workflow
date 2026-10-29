@@ -172,6 +172,17 @@ try:
             r = subprocess.run([sys.executable, str(SKRIP), "--pada", "tidak-ada-123", "handoff/reports/REPORT-B.md"], cwd=p3,
                                capture_output=True, text=True, encoding="utf-8")
             cek("Commit tidak-ada-123 tidak ditemukan" in r.stdout + r.stderr, "opsi lama --pada diterima", r.stdout + r.stderr)
+            if "NAMA_V312" in SKRIP.read_text(encoding="utf-8"):  # v3.12.1: kutipan report lama ke file yang berganti nama
+                p4 = tmp / "proj_v3121"
+                for sub in ("handoff/reports", "handoff/logs", "handoff/tools"):
+                    (p4 / sub).mkdir(parents=True)
+                (p4 / "handoff/logs/provenance.jsonl").write_text('{"file": "x", "sha256": "0"}\n', encoding="utf-8")
+                (p4 / "handoff/tools/record.py").write_text("import sys\n", encoding="utf-8")
+                rc, out = jalan(p4, "```bukti\nhandoff/logs/asal.jsonl:1 | sha256\n```\n", "REPORT-L.md")
+                cek(rc == 0 and "0 masalah" in out, "kutipan report lama ke asal.jsonl dibaca dari provenance.jsonl (isi sama)", out)
+                rc, out = jalan(p4, "```bukti\nhandoff/tools/catat.py:1 | import sys\n```\n", "REPORT-M.md")
+                cek(rc == 1 and "sejak v3.12 bernama handoff/tools/record.py" in out,
+                    "kutipan report lama ke catat.py: masalah, dengan nama barunya dan saran --at-report", out)
         else:
             print("LEWAT uji v3.12: check_evidence.py versi lama")
 

@@ -105,7 +105,7 @@ def main():
     ap.add_argument("perintah", metavar="command", help="perintah yang dijalankan, dalam satu string")
     ap.add_argument("--append", dest="tambah", action="store_true", help="tambahkan ke log yang sudah ada")
     ap.add_argument("--pwsh", action="store_true", help="jalankan lewat PowerShell")
-    ap.add_argument("--result", dest="hasil", action="append", default=[],
+    ap.add_argument("--result", dest="hasil", action="append", default=[], metavar="FILE",
                     help="file atau pola glob (dikutip) yang ditulis perintah itu sendiri; boleh berulang")
     ap.add_argument("--overwrite", dest="timpa", action="store_true", help="izinkan menimpa log task yang sudah DONE/BLOCKED")
     # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.

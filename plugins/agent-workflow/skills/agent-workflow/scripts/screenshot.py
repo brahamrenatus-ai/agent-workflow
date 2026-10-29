@@ -281,10 +281,10 @@ def main():
     ap = argparse.ArgumentParser(description="Foto tampilan halaman di beberapa ukuran layar dan ukur elemen yang keluar layar.")
     ap.add_argument("halaman", metavar="page", help="URL (http://, https://, file://) atau path file .html")
     ap.add_argument("prefix", help="awalan file tangkapan layar, mis. handoff/logs/TASK-012-beranda")
-    ap.add_argument("--sizes", dest="ukuran", nargs="+", default=["375x812", "1366x768"],
+    ap.add_argument("--sizes", dest="ukuran", nargs="+", default=["375x812", "1366x768"], metavar="WxH",
                     help="ukuran layar WxH (bawaan: 375x812 1366x768)")
     ap.add_argument("--offline", dest="luring", action="store_true", help="blokir semua host selain localhost dan 127.0.0.1")
-    ap.add_argument("--wait", dest="tunggu", type=int, default=1500, help="jeda sesudah halaman termuat, dalam ms (bawaan 1500)")
+    ap.add_argument("--wait", dest="tunggu", type=int, default=1500, metavar="MS", help="jeda sesudah halaman termuat, dalam ms (bawaan 1500)")
     # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.
     ap.add_argument("--ukuran", dest="ukuran", nargs="+", help=argparse.SUPPRESS)
     ap.add_argument("--luring", dest="luring", action="store_true", help=argparse.SUPPRESS)
