@@ -271,6 +271,17 @@ Perubahan lain tanpa penanda baru: `references/orca.md` (§Akun Claude worker, p
 | D7 | Head membaca terminal worker di antara tunggu, karena konfirmasi alat dan dialog batas pemakaian tidak tampil di `check`/`worker-list`. Konfirmasi dijawab user, atau head untuk perintah langkah task bila user menyerahkannya. Di dialog batas pemakaian tidak ada opsi berbayar yang dipilih; worker dihentikan dengan `worker-stop` | instruksi head | T1 §Executor lewat Orca (butir **Konfirmasi dan dialog di terminal worker**; butir Tunggu memakai timeout pendek) | Penyerahan konfirmasi ke head: keputusan user |
 | D8 | Worker Claude Code memakai akun sesi head: bila `CLAUDE_CONFIG_DIR` sesi head berisi, worker diluncurkan di terminal sendiri lalu diserahi task dengan `worker-start --terminal`; bukti model dari header dan transkrip; terminal ditutup sesudah release | instruksi head | T1 §Executor lewat Orca (butir **Worker Claude Code memakai akun sesi head**) | – |
 
+## v3.14 (2026-10-30): head menunggu hemat token dan bekerja paralel
+Berasal dari pemakaian Orca di aplikasi budidaya. Head yang menunggu executor bangun tiap 2 menit untuk membaca terminal worker (aturan v3.13), dan setiap kali bangun seluruh konteksnya dibaca ulang: 32 panggilan API dalam 19 menit, setara ±1 juta token input. Selama itu head juga dilarang mengubah file, jadi ia hanya menunggu, padahal user ingin head tetap mengerjakan UI selama executor mengerjakan backend.
+
+Perubahan lain tanpa penanda baru: `references/orca.md` §Menunggu dan bekerja paralel, baris opsional `Dikerjakan head bersamaan:` di T3 §Format Task, dan cara membaca terminal di butir D7 (saat loop tunggu selesai tanpa pesan; putaran pendek hanya bila agen worker meminta konfirmasi).
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| D9 | Head boleh terus bekerja di wilayah file lain selama worker berjalan: wilayahnya ditulis di task atau dikirim ke worker, sumber daya bersama dipegang task worker, head hanya meng-commit file miliknya; bila tidak bisa dipisah, tunggu atau pakai worktree | instruksi head | T1 §Executor lewat Orca (butir **Kerja paralel head dan worker**) | – |
+| D10 | Executor mengabaikan wilayah `Dikerjakan head bersamaan:` saat Periksa Diri, tidak mengubah atau men-stage-nya | brief executor | T2a Periksa Diri (`git status`) / T2b langkah 6 | – |
+| D11 | Head menunggu dengan satu loop latar belakang yang selesai hanya bila ada pesan, galat, atau sesudah empat putaran; heartbeat di-ack singkat; sesi head baru bila konteks sudah besar | instruksi head | T1 §Executor lewat Orca (butir **Tunggu tanpa bangun berkala**) | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -380,4 +391,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.12.1 N13 file:handoff/tools/check_secrets.py~--diff-filter=ACMR  @bila_secret
 3.13 D7    head~worker-read  @bila_orca
 3.13 D8    head~CLAUDE_CONFIG_DIR  @bila_orca
+3.14 D9    head~Dikerjakan head bersamaan  @bila_orca
+3.14 D10   executor~Dikerjakan head bersamaan  @bila_orca
+3.14 D11   head~Tunggu tanpa bangun berkala  @bila_orca
 ```

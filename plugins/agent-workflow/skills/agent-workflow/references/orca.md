@@ -51,6 +51,13 @@ Model baru di tabel diuji kalibrasi dengan model dan effort yang akan dipakai (`
 3. Selama kalibrasi, pertanyaan worker tentang isi task dijawab "ikuti task persis seperti tertulis". Jawaban yang memberi isi merusak uji.
 4. Sesudah `worker_done`, jalankan `calibrate.py grade`. Catat hasilnya di Riwayat kapasitas beserta bukti modelnya (`launch.effective`, atau header dan transkrip untuk worker di terminal sendiri), lalu lepas worker dan tutup terminal yang kamu buat.
 
+## Menunggu dan bekerja paralel
+Setiap kali head bangun, seluruh konteks sesinya dibaca ulang. Di satu project lapangan, head dengan konteks ±175 ribu token yang bangun tiap 2 menit memakai 32 panggilan API dalam 19 menit pemantauan, setara ±1 juta token input, sementara kode task-nya ditulis executor tanpa token Claude. Di project yang sama, satu task yang dikerjakan head sendiri dengan konteks rata-rata ±480 ribu token memakai 169 panggilan, setara ±10,6 juta token input.
+- Head menunggu dengan satu loop latar belakang yang baru selesai bila ada pesan, galat, atau sesudah empat putaran (T1 butir **Tunggu tanpa bangun berkala**). Dicek jalan 2026-10-30: tanpa pesan, loop berputar diam; pesan atau galat membuatnya langsung selesai. Heartbeat cukup di-ack.
+- Selama worker bekerja, head boleh terus bekerja di wilayah file lain (T1 butir **Kerja paralel head dan worker**). Executor mengabaikan wilayah itu saat Periksa Diri, dan sumber daya bersama (DB uji, port, perangkat) dipegang task worker.
+- Bila wilayahnya tidak bisa dipisah, worker dijalankan di worktree sendiri (`--worktree new-child`) dan digabung sesudah triase. Worktree baru belum berisi dependensi (mis. `node_modules`) dan file yang tidak ter-track, termasuk file secret, jadi siapkan dulu atau tuliskan di task.
+- Sesi head baru sesudah triase memangkas biaya bila konteks sudah besar; keadaan project ada di `handoff/`.
+
 ## Batas
 - Orca tidak menggantikan bukti. `worker_done` hanya kabar; triase tetap memakai `check_evidence.py` dan verifikasi sesuai kapasitas.
 - Terminal executor tidak dipakai ulang untuk task lain, karena satu task dikerjakan dalam satu sesi executor (H1).
