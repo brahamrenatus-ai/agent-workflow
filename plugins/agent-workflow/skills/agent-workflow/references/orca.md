@@ -11,7 +11,10 @@ Ditulis dengan Orca 1.4.243 dan dicek ulang dengan 1.4.244. Panduan yang cocok d
 ## Susunan
 - **Head = koordinator.** Satu Run per sesi head. Run itu menjadi kotak masuk `worker_done`, pertanyaan, dan eskalasi dari executor.
 - **Executor = pekerja.** Satu task per dispatch. Sesudah report ditulis dan status task diubah, executor mengirim `worker_done`, lalu diam. Worker bekerja di folder project yang sama dengan head, jadi hanya satu worker yang mengubah file boleh berjalan pada satu waktu; task FAKTA yang hanya membaca boleh berjalan bersamaan.
-- **Sesi head bukan pekerja Orca**, karena head adalah sesi interaktif user. Sesi lain, mis. pengembang skill, boleh membaca terminal head atau mengirim kabar lewat Orca, tetapi tidak mengawasinya.
+- **Sesi head bukan pekerja Orca**, karena head adalah sesi interaktif user. Sesi lain, mis. pengembang skill, boleh membaca terminal head atau mengirim kabar lewat Orca atas izin user, tetapi tidak mengawasinya. Yang teramati dengan Orca 1.4.244:
+  - `orca terminal send --enter` ke terminal Claude Code yang sedang menampilkan dialog (izin, trust, pengaturan) ditolak dengan `agent_prompt_blocked`. `orca terminal read` bisa tidak menampilkan dialog itu bila tampilannya tergulir. Minta user menjawab dialognya, lalu kirim ulang dengan `orca terminal send --retry-request <id>` memakai id dari galat itu.
+  - `orca orchestration send --type escalation` hanya diterima dari worker yang memegang dispatch-nya; dari koordinator atau sesi lain ditolak `sender_not_assignee`. Kabar dari sesi lain memakai `--type status`.
+  - Orca mengetik pemberitahuan pesan baru (juga untuk heartbeat) ke terminal koordinator, dan pemberitahuan itu membangunkan sesi head.
 
 ## Profil Executor sebagai tabel pilihan
 Contoh baris (T3 §Profil Executor):

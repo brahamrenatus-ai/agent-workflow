@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Cek versi protokol agent-workflow di sebuah project.
 
-Dijalankan dari root project, langsung dari folder skill (skrip ini tidak disalin ke project):
+Dijalankan langsung dari folder skill (skrip ini tidak disalin ke project), dari root project atau dengan path-nya:
   python <folder skill>/scripts/check_version.py
+  python <folder skill>/scripts/check_version.py <root project>
 
 Skrip ini:
 - membaca penanda versi `agent-workflow vX` di handoff/README.md (atau skill <prefix>-dev untuk LITE);
@@ -19,7 +20,8 @@ Penanda yang file sasarannya tidak ada (mis. instruksi executor di project LITE)
 Penanda bersyarat juga "n/a" bila syaratnya tidak terpenuhi: `@bila_secret` (project punya file secret lokal),
 `@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop), dan `@bila_orca` (README handoff atau
 instruksi head menyebut Orca, yaitu head menjalankan executor lewat Orca).
-Exit code: 0 = semua penanda yang berlaku ada, 1 = ada yang hilang.
+Path project boleh folder mana pun di dalam repo-nya; yang diperiksa root repo itu. Tanpa path, folder kerja dipakai.
+Exit code: 0 = semua penanda yang berlaku ada, 1 = ada yang hilang, 2 = argumen salah atau path tidak ada.
 """
 import fnmatch
 import glob
@@ -69,14 +71,16 @@ def siapkan_output():
             pass
 
 
-def root_repo():
+def root_repo(folder=None):
+    """Root repo git yang memuat `folder` (default: folder kerja); folder itu sendiri bila bukan repo git."""
+    folder = Path(folder).resolve() if folder else Path.cwd()
     try:
-        out = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        out = subprocess.run(["git", "-C", str(folder), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
         if out.returncode == 0 and out.stdout.strip():
             return Path(out.stdout.strip())
     except OSError:
         pass
-    return Path.cwd()
+    return folder
 
 
 def file_peran(root, peran):
@@ -209,7 +213,18 @@ def kunci_versi(v):
 
 def main():
     siapkan_output()
-    root = root_repo()
+    args = sys.argv[1:]
+    # Dulu argumen diabaikan diam-diam, sehingga path project yang diberikan dari folder lain memeriksa folder kerja.
+    if any(a in ("-h", "--help") for a in args):
+        print(__doc__)
+        return 0
+    if len(args) > 1 or any(a.startswith("-") for a in args):
+        print(f"Argumen tidak dikenal: {' '.join(args)}. Pemakaian: check_version.py [root project]", file=sys.stderr)
+        return 2
+    if args and not Path(args[0]).is_dir():
+        print(f"Folder {args[0]} tidak ada.", file=sys.stderr)
+        return 2
+    root = root_repo(args[0] if args else None)
     penanda = muat_changelog()
     kondisi = {"bila_secret": ada_file_secret(root), "bila_ui": ada_ui(root), "bila_orca": ada_orca(root)}
     tertulis = None

@@ -116,6 +116,19 @@ try:
     rc, out = jalan(d)
     cek("UI: ada" in out and rc == 1 and "I1" in out, "package.json dengan react: project ber-UI, I1–I3 jadi kandidat", out)
 
+    if "def root_repo(folder" in CEK.read_text(encoding="utf-8"):  # path project sebagai argumen sejak v3.15
+        def jalan_dari(cwd, *args):
+            r = subprocess.run([sys.executable, str(CEK), *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8")
+            return r.returncode, r.stdout, r.stderr
+
+        rc0, out0 = jalan(a)
+        rc, out, err = jalan_dari(tmp, str(a / "handoff"))
+        cek(rc == rc0 and out == out0, "path project sebagai argumen (dari folder lain, menunjuk subfolder project): hasil sama dengan dijalankan di root", out + err)
+        rc, out, err = jalan_dari(a, "--root", str(b))
+        cek(rc == 2 and "tidak dikenal" in err and "Root:" not in out, "opsi tidak dikenal: exit 2, tidak diam-diam memeriksa folder kerja", out + err)
+        rc, out, err = jalan_dari(a, str(tmp / "tidak-ada"))
+        cek(rc == 2 and "tidak ada" in err, "path yang tidak ada: exit 2", out + err)
+
     e = tmp / "id_mirip"
     buat(e)
     p = e / ".claude/skills/demo-executor/SKILL.md"

@@ -5,7 +5,7 @@ description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/p
 
 # Agent Workflow — Head + Executor untuk Project Apa Pun
 
-**Versi skill: 3.14.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
+**Versi skill: 3.15.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
 
 Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewat file di repo:
 - **Head** (perencana) menjaga arah, menganalisis hasil, memutuskan, mendesain, menulis task, dan memverifikasi.
@@ -52,7 +52,7 @@ Jelaskan mode yang dipilih beserta alasannya. Dua agen menambah latensi, karena 
 5. **Investigasi tanpa batas, ditambah fitur yang digantung pada masalah di luar jangkauan software, berujung deadlock.** Batasi 3 task per pertanyaan. Sesudahnya: eskalasi, terima sebagai batasan, atau rumuskan ulang. Metrik yang tidak stabil dinilai terhadap baseline sesi yang sama.
 6. **Instruksi yang disalin ke banyak file akan saling bertentangan.** Pegang satu sumber per hal. File lain cukup menjadi penunjuk, dan rule merujuk spec alih-alih menyalinnya.
 7. **NOTES yang menjadi log akan membengkak dan membekukan keputusan lama.** NOTES berisi keadaan sekarang. Setiap keputusan diberi syarat **"buka ulang jika"**.
-8. **Tanpa smoke test end-to-end, fitur inti bisa mati berhari-hari tanpa ketahuan.** Jadwalkan SMOKE berkala di lingkungan atau data uji yang terisolasi. TASK-001 adalah SMOKE baseline.
+8. **Tanpa smoke test end-to-end, fitur inti bisa mati berhari-hari tanpa ketahuan.** Jadwalkan SMOKE berkala di lingkungan atau data uji yang terisolasi. TASK-001 adalah SMOKE baseline. SMOKE yang hanya menuntut "tercetak" juga meloloskan kerusakan: di robot meja, IMU yang mencetak gravitasi ±3 G saat diam lolos seminggu, karena Harapan task lebih lemah dari checklist project. Harapan menuntut nilai yang benar.
 9. **User akan melewati protokol yang terlalu kaku.** Resmikan jalur task ad-hoc, kecuali untuk executor RENDAH.
 10. **Perbaikan bisa membuka bahaya baru.** Contoh dari robot meja: memperbaiki motor yang tak pernah jalan akan membuat robot berkeliling meja padahal sensor jurangnya mati. Periksa interaksinya dengan setelan default dan pengaman lain, lalu tandai TUNGGU-USER.
 11. **Disiplin fakta tetap berharga.** "Jangan klaim penyebab tanpa pembanding" berlaku untuk *klaim*. *Hipotesis* diberi tempat sendiri yang berlabel.
@@ -62,7 +62,7 @@ Jelaskan mode yang dipilih beserta alasannya. Dua agen menambah latensi, karena 
 13. **Batasan "fisik" sering bisa dicek terhadap spesifikasi.** Contoh dari robot meja: HDS meminta pull-up 4,7 kΩ, sedangkan kode hanya memakai pull-up internal. Selisih seperti ini dijadikan **Tugas User**, bukan task ukur berikutnya.
 14. **Penolakan alat bukan rintangan untuk diakali.** Jika hook, izin, atau sandbox menolak sebuah aksi, jangan ulangi lewat tool lain. Laporkan, lalu cari jalan yang disetujui.
 15. **Report bisa "lulus" tanpa bukti yang cocok.**
-    - Contoh dari IoT SCADA: OK ditulis dengan kutipan log yang tidak ada di file log tersimpan, dan nilai harapan yang tidak terpenuhi tetap ditulis OK. Head meloloskannya dua kali. Robot meja mengulangnya di REPORT-054 walau aturannya sudah tertulis; kutipannya tidak disalin dari file mana pun. Di aplikasi budidaya, baris log ditulis tangan (TASK-006) dan pengamatan user dikarang dengan menyalin teks kriteria (REPORT-035).
+    - Contoh dari IoT SCADA: OK ditulis dengan kutipan log yang tidak ada di file log tersimpan, dan nilai harapan yang tidak terpenuhi tetap ditulis OK. Head meloloskannya dua kali. Robot meja mengulangnya di REPORT-054 walau aturannya sudah tertulis; kutipannya tidak disalin dari file mana pun. Di aplikasi budidaya, baris log ditulis tangan (TASK-006) dan pengamatan user dikarang dengan menyalin teks kriteria (REPORT-035). Robot meja mengulangnya di bagian Anomali REPORT-075, yang belum dicek alat; sejak v3.15 kutipan di prosa juga dicocokkan.
     - Cocokkan setiap OK dengan nilai harapan dan setiap kutipan dengan file log. Aturan saja tidak cukup: executor menyimpan output lewat `record.py` (log yang diedit tangan ketahuan dari hash-nya), menjalankan `check_evidence.py` sebelum DONE, dan menyusun report dari file tersimpan, satu sesi per task. Head menjalankan alat yang sama saat triase.
     - Urutan kekuatan bukti: yang bisa dijalankan ulang, lalu kutipan dari file tersimpan, lalu klaim.
 16. **File protokol bukan tempat secret.**
@@ -204,7 +204,7 @@ handoff/
 Diagnosis dulu, ubah setelah disetujui.
 
 1. **Kumpulkan bukti berupa angka dan kutipan:**
-   - **Versi protokol.** Jalankan `python <folder skill>/scripts/check_version.py` dari root project. Hasilnya: penanda versi yang tertulis, versi efektif, dan penanda yang hilang. Penanda K1/K2 juga memeriksa apakah instruksi tiap peran bisa ditemukan tool yang tercatat di README.
+   - **Versi protokol.** Jalankan `python <folder skill>/scripts/check_version.py` dari root project, atau dengan path root project sebagai argumen. Hasilnya: penanda versi yang tertulis, versi efektif, dan penanda yang hilang. Penanda K1/K2 juga memeriksa apakah instruksi tiap peran bisa ditemukan tool yang tercatat di README.
    - Komposisi task (ukur vs bangun) dan rantai investigasi terpanjang.
    - Apakah dokumen arah pernah dirujuk (grep nama filenya).
    - Aturan yang mematikan inisiatif, dan apakah template report punya kanal usulan.
@@ -240,7 +240,7 @@ Diagnosis dulu, ubah setelah disetujui.
 - [ ] Bila memakai Orca: peluncuran per model di Profil Executor, setelan izin agen, dan dispatch baca-saja (`references/orca.md`)
 
 **Jalur upgrade.** Dipakai bila user hanya meminta upgrade, atau bila versi efektif project lebih lama dari versi skill ini.
-1. Jalankan `python <folder skill>/scripts/check_version.py` dari root project. Bila lebih dari dua penanda dasar (v2.1) hilang, lakukan audit penuh, bukan upgrade per baris.
+1. Jalankan `python <folder skill>/scripts/check_version.py` dari root project (atau dengan path-nya sebagai argumen). Bila lebih dari dua penanda dasar (v2.1) hilang, lakukan audit penuh, bukan upgrade per baris.
 2. Untuk setiap penanda yang hilang, baca baris ID-nya di `references/changelog.md`: file sasaran, cara patch, dan perlu-tidaknya persetujuan.
 3. Saring dengan §Kualitas Rekomendasi. Yang tidak sepadan untuk project ini dilewati, dan alasannya ditulis.
 4. Patch seminimal mungkin di file sasaran, mengikuti bahasa dan gaya file project.

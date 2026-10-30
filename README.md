@@ -38,10 +38,10 @@ Capacity is tracked **per model**, so one project can use several executor model
 | Script | Copied into the project | Purpose |
 |---|---|---|
 | `record.py` | yes (`handoff/tools/`) | Runs a command, saves its output byte-for-byte as an evidence log, and records provenance (command, exit code, SHA-256) in `handoff/logs/provenance.jsonl`. `--result` registers files the command wrote (glob patterns allowed); logs of finished tasks are not overwritten without `--overwrite`. |
-| `check_evidence.py` | yes | Checks a report against its evidence: every `file:line` quote, every OK against its expected value, log provenance, and that each acceptance criterion has a row. `--at <commit>` / `--at-report` check old reports against the files as they were. Reads Indonesian or English reports. |
+| `check_evidence.py` | yes | Checks a report against its evidence: every `file:line` quote (also quotes in prose such as the Anomalies section), every OK against its expected value, log provenance (including logs overwritten by a different command), that each acceptance criterion has a row, and that expected values copied from a task's data-table template were not changed. `--at <commit>` / `--at-report` check old reports against the files as they were. Reads Indonesian or English reports. |
 | `check_secrets.py` | yes, if the project has local secret files | Finds secrets in files before commit by pattern and by the actual values from your local secret files, without printing them. `--staged`, `--redact`. |
 | `screenshot.py` | yes, if the project has a web UI | Screenshots a page at target screen sizes using real device emulation through the Chrome DevTools Protocol, and reports the page width and any element that sticks out of the screen (exit 1 if so). `--offline` blocks every host except localhost. |
-| `check_version.py` | no (run from the skill folder) | Compares the project's protocol with the changelog markers, reports the effective version and the patches still missing. |
+| `check_version.py` | no (run from the skill folder, in the project root or with its path as the argument) | Compares the project's protocol with the changelog markers, reports the effective version and the patches still missing. |
 | `calibrate.py` | no | Builds and scores the calibration test for a new executor model. |
 
 All scripts use only the Python standard library. `screenshot.py` also needs Chrome, Chromium, or Edge.

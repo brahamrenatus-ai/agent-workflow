@@ -282,6 +282,23 @@ Perubahan lain tanpa penanda baru: `references/orca.md` §Menunggu dan bekerja p
 | D10 | Executor mengabaikan wilayah `Dikerjakan head bersamaan:` saat Periksa Diri, tidak mengubah atau men-stage-nya | brief executor | T2a Periksa Diri (`git status`) / T2b langkah 6 | – |
 | D11 | Head menunggu dengan satu loop latar belakang yang selesai hanya bila ada pesan, galat, atau sesudah empat putaran; heartbeat di-ack singkat; sesi head baru bila konteks sudah besar | instruksi head | T1 §Executor lewat Orca (butir **Tunggu tanpa bangun berkala**) | – |
 
+## v3.15 (2026-10-31): kutipan di prosa, Harapan yang kuat, hasil di luar repo
+Berasal dari survei lapangan 31 Okt. Empat hal muncul di sana:
+- Di robot meja, executor RENDAH yang sedang menjalani masa percobaan mengutip baris log yang tidak ada (`Roll: 12.2 deg ...`) di bagian Anomali, dan satu rujukan baris lain salah. `check_evidence.py` meloloskan report itu (0 masalah), karena hanya blok bukti, tabel, dan blok kode yang dicek; head menemukannya dengan grep, lalu model itu turun kembali ke RENDAH. Report sebelumnya juga merujuk baris ringkasan yang tidak memuat angka yang diklaim.
+- Masih di robot meja, item SMOKE "IMU tercetak" berstatus OK sementara IMU mencetak gravitasi ±3 G saat diam. Checklist SMOKE project menuntut "nilai valid", tetapi Harapan di task diringkas menjadi lebih lemah, sehingga sensor yang tidak valid sejak seminggu sebelumnya lolos. Ambang lain di task sebelumnya juga ditebak, bukan diambil dari data dasar.
+- Executor yang sama pernah menulis ulang kolom Harapan menjadi nilai teramati lalu memberi OK, dan menimpa log bukti dengan perintah yang dipersempit tanpa melaporkannya. Penangkal head (templat tabel Data dengan Harapan terisi) berhasil di empat report berikutnya, tetapi hanya sebagai instruksi.
+- Di aplikasi budidaya, purwarupa peta kolam yang disetujui user hanya tercatat di transkrip sesi head; sesudah itu head mencatat tautan Artifact, tetapi dengan "akun sesi ini" dan salinan sumber di scratchpad sesi, yang tidak bisa ditemukan sesi berikutnya. Implementasi rujukan head untuk triase juga disimpan di scratchpad.
+
+Perubahan lain tanpa penanda baru: `check_evidence.py` menghitung nomor baris seperti grep (form feed di awal log robot meja menggeser semua nomor baris sebanyak satu), kalimat implementasi rujukan di T1 (bukan scratchpad sesi; path-nya di ROADMAP §1), format kutipan di prosa di T2a dan T6, catatan peringatan log ditimpa di T1 langkah 2, `check_version.py <root project>` (dulu argumen diabaikan diam-diam, sehingga yang diperiksa folder kerja), `references/low-capacity.md` (templat tabel Data), dan `references/orca.md` (pesan ke terminal yang menampilkan dialog, eskalasi dari koordinator).
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| K3 | Harapan task sekuat definisi project: pemeriksaan yang sudah didefinisikan (checklist §SMOKE, spesifikasi, test) disalin syarat lolosnya atau dirujuk `file:baris`; nilai ukur dinilai dengan rentang atau nilai yang benar, bukan "tercetak"/"ada"; ambang dari data dasar yang diukur | instruksi head | T1 langkah 4 (butir **Harapan sekuat definisi project**) | – |
+| P5 | Task untuk executor RENDAH dan task uji naik memuat templat tabel Data: Harapan terisi, Teramati, Bukti, dan Status kosong | instruksi head (+ README §Format Task) | T1 langkah 4 (butir **Templat tabel Data**); T3 §Format Task, baris Kriteria terima | – |
+| P6 | Executor menyalin templat tabel Data dari task dengan Harapan persis; satu baris boleh dipecah menjadi beberapa baris berawalan sama; Teramati yang tidak memenuhi Harapan ditulis GAGAL | brief executor (+ REPORT_TEMPLATE) | T2a langkah 4 / T2b format report; T6 catatan tabel Data | – |
+| H2 | Hasil kerja head di luar repo (Artifact, kanvas desain, purwarupa, dokumen di layanan lain) dirujuk di dokumen rancangan atau ROADMAP saat dibuat: tautan, nama akun pemilik, keputusan user dalam kata-kata; sumber yang menjadi dasar implementasi disalin ke repo, bukan ke scratchpad sesi | instruksi head / skill dev (LITE) | T1 langkah 5 (butir **Hasil di luar repo**) / T8 langkah 5 | – |
+| Y8 | `check_evidence.py` memeriksa kutipan di prosa (`teks` (`file:baris`) ke file log), templat tabel Data di task, dan log yang ditimpa dengan perintah lain; nomor baris dihitung seperti grep | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py`, setelah dibandingkan dengan salinan project (tambalan lokal dipertahankan); tambahkan kalimat format kutipan di prosa ke REPORT_TEMPLATE §Ringkasan Fakta dan brief executor (T6, T2a langkah 4) | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -394,4 +411,9 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.14 D9    head~Dikerjakan head bersamaan  @bila_orca
 3.14 D10   executor~Dikerjakan head bersamaan  @bila_orca
 3.14 D11   head~Tunggu tanpa bangun berkala  @bila_orca
+3.15 K3    head~Harapan sekuat definisi project
+3.15 P5    head~templat tabel Data
+3.15 P6    executor~templat tabel Data
+3.15 H2    head~Hasil di luar repo || dev~Hasil di luar repo
+3.15 Y8    file:handoff/tools/check_evidence.py~def cek_prosa
 ```

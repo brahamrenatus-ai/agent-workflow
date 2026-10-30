@@ -16,6 +16,7 @@ Dasarnya pengalaman project robot meja (Pelajaran 21–22). Model yang sama gaga
 
 - Executor RENDAH tidak menghitung, meringkas, atau memutuskan lolos/gagal. Tugasnya menjalankan skrip dan menempel output-nya apa adanya.
 - **Nilai harapan diambil dari hasil menjalankan skrip.** Sebelum mendelegasikan, head menjalankan skrip itu pada data contoh (log lama, fixture, atau run kering), lalu menyalin nilai harapan dari hasilnya. Nilai harapan yang ditulis tangan mudah bertentangan dengan aturan di task yang sama. Contoh robot meja: harapan T6 di TASK-064 menulis `tekan_kabel::y`, padahal aturan parsing task itu menghasilkan `tekan_kabel:-:y`.
+- **Templat tabel Data** (sejak v3.15): kriteria terima ditulis sebagai tabel report dengan Harapan terisi; executor menyalinnya, dan `check_evidence.py` menolak Harapan yang berubah atau baris templat yang hilang. Contoh robot meja: executor RENDAH di task uji naik menulis ulang Harapan `compiled=<tanggal dan jam build ini>` menjadi nilai teramatinya lalu memberi OK; dengan templat, empat report berikutnya menyalin Harapan persis.
 - Aturan parsing hanya ditulis di satu tempat: docstring skrip, atau bagian task yang dirujuk skrip.
 - Skrip disimpan di lokasi alat menurut peta struktur (mis. `handoff/tools/`) dan di-commit. Skrip hanya membaca file, kecuali task menyebut lain.
 - **Verifikasi head** dilakukan dengan menjalankan ulang skrip, lalu membandingkan hasilnya dengan yang ditempel di report. Bila berbeda, report itu dicatat sebagai temuan integritas.

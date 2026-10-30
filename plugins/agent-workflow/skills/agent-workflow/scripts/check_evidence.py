@@ -33,13 +33,25 @@ Yang dicek:
    disamarkan `check_secrets.py --redact` tetap cocok, karena skrip itu menambahkan catatan asal baru.
 5. Kriteria task: bila kriteria terima di handoff/tasks/TASK-NNN-*.md bernomor K1, K2, ..., setiap nomor harus
    muncul di awal kolom Kriteria tabel Data report.
+6. Templat tabel Data di task: tabel task berkolom Kriteria, Harapan, dan Teramati yang kolom Teramati dan Status-nya
+   kosong adalah templat. Setiap barisnya harus ada di tabel Data report dengan Harapan yang sama persis (backtick
+   diabaikan). Satu baris templat boleh dipecah menjadi beberapa baris report yang kolom Kriterianya berawalan sama,
+   mis. `S6 sensors` -> `S6 sensors (IMU)` dan `S6 sensors (ToF)`.
+7. Kutipan di prosa (di luar tabel dan blok kode): teks berbacktick yang langsung diikuti rujukan dalam kurung,
+   mis. `ka_err=0` (`handoff/logs/a.log:12`), harus ada di baris yang dirujuk bila rujukannya file log. Beberapa
+   kutipan boleh berantai (`a` dan `b` (`a.log:3..4`)); rentang `:3..4`, `:3-4`, dan daftar `:3, 9` dicek sebagai
+   satu kesatuan; `...` di tengah kutipan menandai potongan. Kutipan berangka yang tidak cocok adalah masalah, yang
+   tanpa angka peringatan. Kutipan perintah (`git ...`, `python ...`) dilewati.
 Peringatan (tidak menggagalkan): klaim berhasil/lulus di luar tabel tanpa rujukan `file:baris`, status GAGAL
 yang sebenarnya memenuhi Harapan, report (selain BLOCKED) tanpa bagian Periksa Diri, kriteria task yang belum
-bernomor K, dan angka bersatuan (mis. `3-6 detik`, `7,20:1`, `45%`) di Ringkasan Fakta, Keputusan Implementasi,
-atau Anomali tanpa rujukan `file:baris` di baris yang sama dan tanpa tanda perkiraan/HIPOTESIS.
+bernomor K, angka bersatuan (mis. `3-6 detik`, `7,20:1`, `45%`) di Ringkasan Fakta, Keputusan Implementasi,
+atau Anomali tanpa rujukan `file:baris` di baris yang sama dan tanpa tanda perkiraan/HIPOTESIS, dan log yang
+dirujuk report tetapi ditimpa dengan perintah lain (menurut provenance.jsonl; `--append` tidak dihitung).
 
 Rujukan `file:baris` boleh berupa path dari root repo, atau nama file saja bila tepat satu file bernama itu
 ada di handoff/logs/. Beberapa baris dari satu file: `file:12, 40, 41`, atau `file:12`, `:40` di sel yang sama.
+Nomor baris dihitung seperti grep dan editor: baris dipisah CR LF, LF, atau CR. Form feed dan pemisah Unicode lain
+(yang juga dipisah str.splitlines()) tidak memulai baris baru.
 
 Report lama (AUDIT, survei): file kode dan dokumen bisa berubah sesudah report ditriase, sehingga kutipan yang dulu
 benar terbaca salah. `--at <commit>` membaca semua file yang dirujuk (termasuk log, task, dan provenance.jsonl) pada
@@ -108,6 +120,14 @@ JUDUL_PERIKSA = re.compile(r"^#+\s*(?:Periksa Diri|Self[- ]?check)", re.I | re.M
 JUDUL_KRITERIA = r"(?:Kriteria terima|Acceptance criteria)"
 BLOCKED = re.compile(r"(?:Status(?: akhir)?|Final status)\s*:\s*\**\s*BLOCKED", re.I)
 BLOK_BUKTI = ("bukti", "evidence")
+# Kutipan di prosa (v3.15): `teks` (`file:baris`), juga `a` dan `b` (`file:3..4`). Rujukan prosa boleh berupa rentang.
+REF_PROSA = re.compile(rf"(?<![\w/.\\-])(?:({FILE}))?:(\d+)(?:(?:\.\.|–|-)(\d+))?((?:\s*,\s*\d+)*)(?![\d:])", re.I)
+KUTIP_RUJUK = re.compile(r"`([^`\n]+)`\s*\(([^()\n]*)\)")
+KUTIP_RANTAI = re.compile(r"`([^`\n]+)`\s*(?:,|;|/|\bdan\b|\band\b|\batau\b|\bor\b)\s*$", re.I)
+SPAN = re.compile(r"`([^`\n]+)`")
+PERINTAH = re.compile(r"^(?:&\s*)?(?:git|python3?|py|node|npm|npx|pnpm|yarn|pio|pip|cd|bash|sh|pwsh|powershell|cmd|curl|docker|"
+                      r"make|cargo|go|dotnet|flutter|adb|orca|claude|agy|select-string|get-\w+)(?:\s|$)", re.I)
+ELISI = re.compile(r"\s*(?:\.\.\.|…)\s*")
 
 
 def siapkan_output():
@@ -136,6 +156,13 @@ def rapi(s):
     return re.sub(r"\s+", " ", s)
 
 
+def pisah_baris(teks):
+    """Baris seperti grep -n dan editor: dipisah CR LF, LF, atau CR saja. str.splitlines() juga memisah form feed,
+    \\x1c-\\x1e, \\x85, dan U+2028/2029, sehingga nomor baris log yang memuatnya bergeser dari nomor di grep."""
+    b = re.split(r"\r\n|\r|\n", teks)
+    return b[:-1] if b and b[-1] == "" else b
+
+
 def tanpa_spasi_sama(s):
     return re.sub(r"\s*=\s*", "=", rapi(s))
 
@@ -151,18 +178,19 @@ def asal_dipakai(berkas):
 
 
 def muat_asal(berkas):
-    """Catatan terakhir per file dari handoff/logs/provenance.jsonl ({path relatif huruf kecil: catatan}); None bila tidak ada."""
+    """Semua catatan per file dari handoff/logs/provenance.jsonl, urut waktu ({path relatif huruf kecil: [catatan]});
+    None bila tidak ada."""
     p = berkas.root / asal_dipakai(berkas)
     if not berkas.ada(p):
         return None
     asal = {}
-    for l in berkas.teks(p).splitlines():
+    for l in pisah_baris(berkas.teks(p)):
         try:
             rec = json.loads(l)
         except ValueError:
             continue
         if isinstance(rec, dict) and rec.get("file") and rec.get("sha256"):
-            asal[rec["file"].replace("\\", "/").lower()] = rec
+            asal.setdefault(rec["file"].replace("\\", "/").lower(), []).append(rec)
     return asal
 
 
@@ -178,7 +206,8 @@ def cek_asal(dirujuk, berkas, asal, wajib, hasil):
             continue
         if not rel.lower().startswith("handoff/logs/") or rel.lower() in (ASAL.as_posix().lower(), ASAL_LAMA.as_posix().lower()):
             continue
-        rec = asal.get(rel.lower())
+        riwayat = asal.get(rel.lower(), [])
+        rec = riwayat[-1] if riwayat else None
         if rec is None:
             pesan = f"log {rel} tidak tercatat di {sumber} (tidak dibuat lewat record.py)"
             (hasil.masalah if wajib else hasil.peringatan)(0, pesan)
@@ -187,10 +216,19 @@ def cek_asal(dirujuk, berkas, asal, wajib, hasil):
                              "jalankan ulang perintahnya, jangan mengedit log")
         else:
             hasil.dicek += 1
+        # Log yang ditimpa dengan perintah lain (pola mempersempit perintah bukti, v3.15); --append dan redact bukan penimpaan.
+        timpa = [(a, b) for a, b in zip(riwayat, riwayat[1:])
+                 if b.get("jenis") != "redact" and not b.get("tambah") and a.get("perintah") != b.get("perintah")]
+        if timpa:
+            a, b = timpa[-1]
+            hasil.peringatan(0, f"log {rel} ditimpa dengan perintah lain: `{a.get('perintah', '?')}` ({a.get('mulai', '?')}) -> "
+                                f"`{b.get('perintah', '?')}` ({b.get('mulai', '?')}); sebut alasannya di Anomali, "
+                                "atau simpan output tiap perintah di log bernama sendiri")
 
 
-def cek_kriteria(path_report, kolom_kriteria, berkas, hasil):
-    """Setiap kriteria K1..Kn di task harus punya baris di tabel Data (kolom Kriteria diawali nomornya)."""
+def cek_kriteria(path_report, data, berkas, hasil):
+    """Kriteria task di tabel Data report: nomor K1..Kn (cek_nomor_k) dan templat tabel Data (cek_templat).
+    `data` berisi (sel Kriteria, sel Harapan atau None, nomor baris) dari tabel Data report."""
     m = re.match(r"REPORT-([\w-]+?)\.md$", path_report.name, re.I)
     if not m:
         return
@@ -198,20 +236,96 @@ def cek_kriteria(path_report, kolom_kriteria, berkas, hasil):
     if not calon:
         return
     teks = berkas.teks(calon[0])
+    hilang = cek_nomor_k(calon[0].name, teks, [k for k, _, _ in data], hasil)
+    cek_templat(calon[0].name, teks, data, hilang, hasil)
+
+
+def cek_nomor_k(nama_task, teks, kolom_kriteria, hasil):
+    """Setiap kriteria K1..Kn di task harus punya baris di tabel Data (kolom Kriteria diawali nomornya).
+    Mengembalikan nomor K yang tidak punya baris."""
     mk = re.search(rf"^#+\s*{JUDUL_KRITERIA}[^\n]*\n(.*?)(?=^#+\s|\Z)", teks, re.M | re.S | re.I)
     if not mk or not mk.group(1).strip():
-        return
+        return set()
     # Hanya nomor di awal kriteria (sel pertama tabel, atau awal butir), bukan sebutan K9 di tengah teks.
     awal = re.compile(r"^\s*(?:\|\s*)?(?:[-*]\s+|\d+[.)]\s+)?[*`]*\s*K(\d+)\b")
-    nomor = sorted({int(m.group(1)) for m in (awal.match(l) for l in mk.group(1).splitlines()) if m})
+    nomor = sorted({int(m.group(1)) for m in (awal.match(l) for l in pisah_baris(mk.group(1))) if m})
     if not nomor:
-        hasil.peringatan(0, f"kriteria terima di {calon[0].name} belum bernomor K1, K2, ...; kelengkapan tabel Data tidak dicek otomatis")
-        return
+        hasil.peringatan(0, f"kriteria terima di {nama_task} belum bernomor K1, K2, ...; kelengkapan tabel Data tidak dicek otomatis")
+        return set()
+    hilang = set()
     for n in nomor:
         if not any(re.match(rf"^\W*K{n}\b", c) for c in kolom_kriteria):
-            hasil.masalah(0, f"kriteria K{n} di {calon[0].name} tidak punya baris di tabel Data (kolom Kriteria diawali K{n})")
+            hasil.masalah(0, f"kriteria K{n} di {nama_task} tidak punya baris di tabel Data (kolom Kriteria diawali K{n})")
+            hilang.add(n)
         else:
             hasil.dicek += 1
+    return hilang
+
+
+def tabel_md(teks):
+    """Tabel Markdown di luar blok kode: [(sel header huruf kecil, [sel per baris])]."""
+    hasil, baris, i, pagar = [], pisah_baris(teks), 0, None
+    while i < len(baris):
+        t = baris[i]
+        m = re.match(r"^\s*(```|~~~)", t)
+        if m:
+            pagar = None if pagar and t.strip().startswith(pagar) else (pagar or m.group(1))
+            i += 1
+            continue
+        if pagar is None and t.strip().startswith("|"):
+            j = i
+            while j < len(baris) and baris[j].strip().startswith("|"):
+                j += 1
+            if j - i >= 3 and re.match(r"^\s*\|?\s*:?-{3,}", baris[i + 1]):
+                hasil.append(([c.lower() for c in sel(baris[i])], [sel(b) for b in baris[i + 2:j]]))
+            i = j
+            continue
+        i += 1
+    return hasil
+
+
+def kunci_sel(s):
+    """Isi sel untuk dibandingkan: tanpa backtick dan tanda tebal, spasi dirapatkan, huruf kecil."""
+    return rapi(s.replace("`", "").replace("*", "")).lower()
+
+
+def cek_templat(nama_task, teks, data, hilang_k, hasil):
+    """Templat tabel Data di task (kolom Kriteria, Harapan, Teramati; Teramati dan Status kosong): setiap baris templat
+    ada di tabel Data report dengan Harapan yang sama. Satu baris templat boleh dipecah menjadi beberapa baris report
+    yang kolom Kriterianya berawalan sama (mis. `K2 A1` -> `K2 A1 boot`, `K2 A1 offset`)."""
+    def kosong(s):
+        return not rapi(s) or re.fullmatch(r"<[^<>]*>", rapi(s)) is not None
+
+    templat = []
+    for h, rows in tabel_md(teks):
+        ik = 0 if h and ("kriteria" in h[0] or "criteri" in h[0]) else None
+        ih = next((i for i, c in enumerate(h) if "harapan" in c or "expected" in c), None)
+        it = next((i for i, c in enumerate(h) if "teramati" in c or "observed" in c), None)
+        ist = next((i for i, c in enumerate(h) if "status" in c), None)
+        if ik is None or ih is None or it is None:
+            continue
+        rows = [c for c in rows if len(c) == len(h) and kunci_sel(c[ik])]
+        if rows and all(kosong(c[it]) and (ist is None or kosong(c[ist])) for c in rows):
+            templat += [(kunci_sel(c[ik]), rapi(c[ik]), kunci_sel(c[ih]), rapi(c[ih])) for c in rows]
+    if not templat:
+        return
+    dipakai = set()
+    for k, harapan, no in data:
+        kk = kunci_sel(k)
+        cocok = [t for t in templat if kk == t[0] or (kk.startswith(t[0]) and not kk[len(t[0])].isalnum())]
+        if not cocok:
+            continue
+        t = max(cocok, key=lambda t: len(t[0]))
+        dipakai.add(t[0])
+        if harapan is None or kunci_sel(harapan) != t[2]:
+            hasil.masalah(no, f"Harapan \"{rapi(harapan or '')}\" berbeda dari templat tabel Data di {nama_task} (\"{t[3]}\"); "
+                              "salin Harapan persis dari task, dan tulis GAGAL bila Teramati tidak memenuhinya")
+        else:
+            hasil.dicek += 1
+    for t in templat:
+        mk = re.match(r"k(\d+)\b", t[0])
+        if t[0] not in dipakai and not (mk and int(mk.group(1)) in hilang_k):
+            hasil.masalah(0, f"baris templat \"{t[1]}\" dari {nama_task} tidak ada di tabel Data report (kolom Kriteria diawali \"{t[1]}\")")
 
 
 def cek_angka(no, baris, hasil):
@@ -301,14 +415,15 @@ class Berkas:
         return sorted(self.root / r for r in self.pohon() if rx.match(r))
 
     def isi_folder(self, p):
-        """Semua file di bawah folder p (rekursif); [] bila p bukan folder."""
+        """Semua file di bawah folder p (rekursif), terurut supaya pesan yang menyebut file lain sama di setiap run;
+        [] bila p bukan folder."""
         if self.rev is None:
-            return [q for q in p.rglob("*") if q.is_file()] if p.is_dir() else []
+            return sorted(q for q in p.rglob("*") if q.is_file()) if p.is_dir() else []
         r = self.rel(p)
         if r is None:
             return []
         awal = r.rstrip("/") + "/"
-        return [self.root / n for n in self.pohon() if n.startswith(awal)]
+        return sorted(self.root / n for n in self.pohon() if n.startswith(awal))
 
     def indeks(self):
         if self._indeks is None:
@@ -339,7 +454,7 @@ class Berkas:
 
     def baris(self, path):
         if path not in self._isi:
-            asli = self.teks(path).splitlines()
+            asli = pisah_baris(self.teks(path))
             self._isi[path] = (asli, [rapi(b) for b in asli])
         return self._isi[path]
 
@@ -514,14 +629,19 @@ def sel(baris):
     return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", s)]
 
 
-def cek_tabel(tabel, berkas, hasil, kolom_kriteria=None):
+def cek_tabel(tabel, berkas, hasil, data=None):
     (_, header), rows = tabel[0], tabel[2:]
     h = [c.lower() for c in sel(header)]
-    if kolom_kriteria is not None and h and ("kriteria" in h[0] or "criteri" in h[0]):
-        kolom_kriteria += [sel(b)[0] for _, b in rows if sel(b)]
 
     def kolom(*nama):
         return next((i for i, c in enumerate(h) if any(n in c for n in nama)), None)
+
+    if data is not None and h and ("kriteria" in h[0] or "criteri" in h[0]):
+        ih = kolom("harapan", "expected")
+        for no, b in rows:
+            c = sel(b)
+            if c:
+                data.append((c[0], c[ih] if ih is not None and ih < len(c) else None, no))
 
     fakta = kolom("pertanyaan", "question") is not None  # tabel task FAKTA: Jawaban berperan sebagai Teramati
     k = {"harapan": kolom("harapan", "expected"), "teramati": kolom("teramati", "observed"),
@@ -610,6 +730,74 @@ def cek_blok_kode(blok, sebelum, berkas, dirujuk, hasil):
             cari_baris_log(no, t, berkas, dirujuk, hasil)
 
 
+def rujukan_prosa(teks):
+    """[(nama file, awal, akhir)] dari teks: `f.log:3`, `f.log:3..4`, `f.log:3-4`, `f.log:3, 9`, dan `:9` lanjutan."""
+    hasil, terakhir = [], None
+    for m in REF_PROSA.finditer(teks):
+        if m.group(1):
+            terakhir = m.group(1)
+        elif not terakhir:
+            continue
+        a = int(m.group(2))
+        hasil.append((terakhir, a, max(a, int(m.group(3) or a))))
+        hasil += [(terakhir, int(n), int(n)) for n in re.findall(r"\d+", m.group(4) or "")]
+    return hasil
+
+
+def bukan_kutipan(s):
+    """Span berbacktick yang bukan kutipan isi file: rujukan, nama file, hitung(), user:, atau perintah."""
+    s = s.strip()
+    return (not s or REF_PROSA.fullmatch(s) is not None or (REF_PROSA.search(s) is not None and re.search(FILE, s, re.I) is not None)
+            or re.fullmatch(FILE, s, re.I) is not None or re.search(r"(?:hitung|count)\(|\buser\s*:", s, re.I) is not None
+            or PERINTAH.match(s) is not None)
+
+
+def cek_prosa(no, t, berkas, hasil):
+    """Kutipan di prosa: `teks` (`file:baris`) harus ada di baris yang dirujuk bila rujukannya file log (v3.15).
+    Pola lapangan: kutipan karangan di bagian Anomali dulu lolos, karena hanya blok bukti, tabel, dan blok kode yang dicek."""
+    for m in KUTIP_RUJUK.finditer(t):
+        refs = rujukan_prosa(m.group(2))
+        if not any(n.lower().endswith(LOG_EXT) for n, _, _ in refs):
+            continue
+        # Kutipan di dalam kurung sesudah rujukannya, mis. (`a.log:1` `START ip=...`), adalah yang dikutip dari baris itu.
+        kutipan = [s for s in SPAN.findall(m.group(2)) if not bukan_kutipan(s)]
+        if not kutipan:
+            kutipan, sebelum = [m.group(1)], t[:m.start()]
+            mr = KUTIP_RANTAI.search(sebelum)
+            while mr:
+                kutipan.insert(0, mr.group(1))
+                sebelum = sebelum[:mr.start()]
+                mr = KUTIP_RANTAI.search(sebelum)
+            kutipan = [q for q in kutipan if not bukan_kutipan(q)]
+        calon, files, catatan = [], [], []
+        for nama, a, b in refs:
+            p, _ = berkas.cari(nama)
+            if p is None:
+                continue
+            isi = berkas.baris(p)[1]
+            if a < 1 or a > len(isi):
+                catatan.append(f"{nama} hanya {len(isi)} baris")
+            potong = isi[a - 1:min(len(isi), b)] if a >= 1 else []
+            calon += potong + ([" ".join(potong)] if b > a else [])
+            files.append(p)
+        if not files:
+            continue
+        for q in kutipan:
+            bagian = [rapi(x) for x in ELISI.split(q) if rapi(x)]
+            if not bagian:
+                continue
+            if any(all(x in c for x in bagian) for c in calon):
+                hasil.dicek += 1
+                continue
+            ada = [f"{p.relative_to(berkas.root).as_posix()}:{i}" for p in files
+                   for i, c in enumerate(berkas.baris(p)[1], 1) if all(x in c for x in bagian)][:3]
+            ruj = ", ".join(f"{n}:{a}" + (f"..{b}" if b > a else "") for n, a, b in refs)
+            petunjuk = (f"; teks itu ada di {', '.join(ada)}" if ada else "; teks itu tidak ada di file yang dirujuk") + \
+                       (f" ({'; '.join(catatan)})" if catatan else "")
+            pesan = f"kutipan `{rapi(q)[:100]}` tidak ada di baris yang dirujuk ({ruj}){petunjuk}"
+            (hasil.masalah if re.search(r"\d", q) else hasil.peringatan)(no, pesan)
+
+
 def file_dirujuk(teks, berkas, path_report):
     """File yang ada dan disebut teks, lewat rujukan `file:baris` atau nama log; report itu sendiri tidak dihitung."""
     hasil = []
@@ -622,10 +810,10 @@ def file_dirujuk(teks, berkas, path_report):
 
 def periksa(path_report, berkas, asal=None, wajib_asal=False):
     teks = path_report.read_text(encoding="utf-8", errors="replace")
-    baris = teks.splitlines()
+    baris = pisah_baris(teks)
     hasil = Hasil(path_report.name)
     dirujuk = file_dirujuk(teks, berkas, path_report)
-    i, ada_tabel, kolom_kriteria, bagian = 0, False, [], ""
+    i, ada_tabel, data, bagian = 0, False, [], ""
     while i < len(baris):
         t = baris[i]
         pagar = re.match(r"^\s*(```|~~~)\s*([\w-]*)", t)
@@ -653,7 +841,7 @@ def periksa(path_report, berkas, asal=None, wajib_asal=False):
                 j += 1
             tabel = [(k + 1, baris[k]) for k in range(i, j)]
             if len(tabel) >= 3 and re.match(r"^\s*\|?\s*:?-{3,}", tabel[1][1]):
-                ada_tabel = cek_tabel(tabel, berkas, hasil, kolom_kriteria) or ada_tabel
+                ada_tabel = cek_tabel(tabel, berkas, hasil, data) or ada_tabel
             i = j
             continue
         s = t.strip()
@@ -664,13 +852,15 @@ def periksa(path_report, berkas, asal=None, wajib_asal=False):
             hasil.peringatan(i + 1, f"klaim \"{mk.group(0)}\" tanpa rujukan file:baris")
         if BAGIAN_ANGKA.search(bagian) and s and not s.startswith(("#", "(")):
             cek_angka(i + 1, s, hasil)
+        if not s.startswith(("#", ">")):
+            cek_prosa(i + 1, t, berkas, hasil)
         i += 1
     blocked = BLOCKED.search(teks)
     # Log yang hanya tercantum di output git status (Periksa Diri) bukan bukti, jadi asalnya tidak dicek (v3.9.2).
     bukti_log = file_dirujuk("\n".join(b for b in baris if not STATUS_GIT.match(b)), berkas, path_report)
     cek_asal(bukti_log, berkas, asal, wajib_asal, hasil)
     if not blocked:
-        cek_kriteria(path_report, kolom_kriteria, berkas, hasil)
+        cek_kriteria(path_report, data, berkas, hasil)
     if hasil.dicek == 0 and not ada_tabel and not blocked:
         hasil.masalah(0, "tidak ada bukti yang bisa dicek (blok bukti, tabel Bukti/Status, atau baris log dari file)")
     if not blocked and not JUDUL_PERIKSA.search(teks):

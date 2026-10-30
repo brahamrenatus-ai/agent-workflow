@@ -1,4 +1,5 @@
 """Uji fungsional scripts/check_evidence.py pada project palsu. Pemakaian: python -X utf8 tests/test_check_evidence.py <path check_evidence.py>"""
+import re
 import shutil
 import subprocess
 import sys
@@ -316,6 +317,84 @@ try:
         cek("berubah setelah dicatat" in out, "tanpa --at: log yang diedit di working tree tetap tertangkap", out)
     else:
         print("LEWAT uji v3.10: check_evidence.py versi lama")
+
+    # ---- v3.15: kutipan di prosa, nomor baris seperti grep, log ditimpa perintah lain, templat tabel Data ----
+    if "def cek_prosa" in SKRIP.read_text(encoding="utf-8"):
+        p6 = tmp / "proj6"
+        for d in ("handoff/reports", "handoff/logs", "handoff/tasks", "src"):
+            (p6 / d).mkdir(parents=True)
+        (p6 / "handoff/logs/TASK-6-imu.log").write_text(
+            "[BOOT] 8c. ConfigBackup OK\n[BOOT] 8d. Init DisplayManager...\n"
+            "MPU6050 6-DOF IMU : ONLINE (0x68) | Roll: 1.2 deg, Pitch: -3.4 deg\nGravitasi: 1.01 G\n"
+            "{\"roll\":-31.6,\"pitch\":-14.8,\"accelG\":3.46}\n", encoding="utf-8")
+        (p6 / "src/imu.py").write_text("def baca():\n    return 0\n", encoding="utf-8")
+        benar = ("# REPORT-6\n## Ringkasan Fakta\n"
+                 "- Saat boot tercetak `[BOOT] 8c. ConfigBackup OK` (`handoff/logs/TASK-6-imu.log:1`).\n"
+                 "- IMU `MPU6050 6-DOF IMU : ONLINE (0x68) | Roll: 1.2 deg` dan `Gravitasi: 1.01 G` (`handoff/logs/TASK-6-imu.log:3..4`).\n"
+                 "- Stream `\"roll\":-31.6` (`TASK-6-imu.log:5`), potongan `MPU6050 ... Pitch: -3.4 deg` (`handoff/logs/TASK-6-imu.log:3`).\n"
+                 "- Perintah `python handoff/tools/x.py 9` (`handoff/logs/TASK-6-imu.log:1`); fungsi `bacaImu` (`src/imu.py:1`).\n"
+                 "- Daemon (`handoff/logs/TASK-6-imu.log:1` `ConfigBackup OK`).\n"
+                 "- Dua baris `[BOOT] 8c. ConfigBackup OK` dan `Gravitasi: 1.01 G` (`handoff/logs/TASK-6-imu.log:1`, `:4`).\n## Periksa Diri\n- ok\n")
+        rc, out = jalan(p6, benar, "REPORT-6.md")
+        cek(rc == 0 and "0 masalah" in out and "kutipan `" not in out,
+            "kutipan di prosa yang benar (rentang ..,  berantai, lanjutan, potongan ..., di dalam kurung) lolos; perintah dan rujukan kode dilewati", out)
+        karang = ("# REPORT-6\n## Anomali / Pertanyaan\n"
+                  "1. Kondisi C: `MPU6050 6-DOF IMU : ONLINE (0x68) | Roll: 12.2 deg, Pitch: -43.2 deg` dan `Gravitasi: 2.83 G`"
+                  " (`handoff/logs/TASK-6-imu.log:1..2`). Lalu `\"roll\":-31.6` (`handoff/logs/TASK-6-imu.log:4`).\n"
+                  "2. Tercetak `Init Display` (`handoff/logs/TASK-6-imu.log:1`).\n## Periksa Diri\n- ok\n")
+        rc, out = jalan(p6, karang, "REPORT-6.md")
+        cek(rc == 1 and len(re.findall(r"MASALAH +baris 3: kutipan `", out)) == 3 and "Roll: 12.2" in out and "Gravitasi: 2.83 G" in out
+            and "teks itu ada di handoff/logs/TASK-6-imu.log:5" in out,
+            "kutipan karangan di Anomali (pola lapangan v3.15): 3 masalah, rujukan baris salah diberi baris yang benar", out)
+        cek("PERINGATAN baris 4" in out and "Init Display" in out and "TASK-6-imu.log:2" in out,
+            "kutipan tanpa angka yang tidak cocok: peringatan, dengan petunjuk barisnya", out)
+
+        (p6 / "handoff/logs/ff.log").write_bytes(b"\x0c[BOOT] a\n[BOOT] b\n")
+        rc, out = jalan(p6, "# R\n```bukti\nhandoff/logs/ff.log:2 | [BOOT] b\nhandoff/logs/ff.log:1 | [BOOT] a\n```\n## Periksa Diri\n", "REPORT-F.md")
+        cek(rc == 0 and "0 masalah" in out, "log diawali form feed: nomor baris sama dengan grep -n (form feed tidak memulai baris baru)", out)
+
+        p7 = tmp / "proj7"
+        (p7 / "handoff/reports").mkdir(parents=True)
+        CATAT = SKRIP.parent / "record.py"
+
+        def catat(log, teks, *opsi):
+            subprocess.run([sys.executable, str(CATAT), *opsi, f"handoff/logs/{log}",
+                            f'"{sys.executable}" -c "print(\'{teks}\')"'], cwd=p7, capture_output=True)
+        catat("TASK-7-diff.log", "[UJI] semua 3 file")
+        catat("TASK-7-diff.log", "[UJI] hanya src")
+        catat("TASK-7-sama.log", "[UJI] x=1")
+        catat("TASK-7-sama.log", "[UJI] x=1")
+        catat("TASK-7-tambah.log", "[UJI] a=1")
+        catat("TASK-7-tambah.log", "[UJI] b=2", "--append")
+        rep7 = ("# REPORT-7\n```bukti\nhandoff/logs/TASK-7-diff.log:1 | [UJI] hanya src\nhandoff/logs/TASK-7-sama.log:1 | [UJI] x=1\n"
+                "handoff/logs/TASK-7-tambah.log:2 | [UJI] b=2\n```\n## Periksa Diri\n- ok\n")
+        rc, out = jalan(p7, rep7, "REPORT-7.md")
+        cek(rc == 0 and out.count("ditimpa dengan perintah lain") == 1 and "TASK-7-diff.log ditimpa" in out and "semua 3 file" in out,
+            "log ditimpa dengan perintah lain -> peringatan; perintah sama diulang dan --append tidak", out)
+
+        (p6 / "handoff/tasks/TASK-T-templat.md").write_text(
+            "# TASK-T\n## Kriteria terima\n| Kriteria | Harapan | Teramati | Bukti | Status |\n|---|---|---|---|---|\n"
+            "| K1 build | `elf=` berbeda dari sebelum flash | | `<log>:<baris>` | |\n| K2 A1 | n ≥ 10 | | `<log>:<baris>` ×2 | |\n"
+            "| K3 | user: robot dimiringkan | | `user: \"...\"` | |\n| S1 crash | 0 `Guru Meditation` | | `hitung(<log>, \"...\")` | |\n"
+            "## Konteks\n| Kriteria | Harapan | Teramati | Bukti | Status |\n|---|---|---|---|---|\n| K1 lama | x | y | - | TIDAK DIUJI |\n",
+            encoding="utf-8")
+        data = "## Data yang Diminta\n| Kriteria | Harapan | Teramati | Bukti | Status |\n|---|---|---|---|---|\n"
+        salin = ("# REPORT-T\n" + data + "| K1 build | elf= berbeda dari sebelum flash | - | - | TIDAK DIUJI |\n"
+                 "| K2 A1 boot | n ≥ 10 | - | - | TIDAK DIUJI |\n| K2 A1 offset | n ≥ 10 | - | - | TIDAK DIUJI |\n"
+                 "| K3 | user: robot dimiringkan | - | - | TIDAK DIUJI |\n| S1 crash | 0 `Guru Meditation` | - | - | TIDAK DIUJI |\n"
+                 "\n## Periksa Diri\n- ok\n")
+        rc, out = jalan(p6, salin, "REPORT-T.md")
+        cek(rc == 0 and "templat" not in out, "templat tabel Data disalin (backtick boleh hilang, baris boleh dipecah berawalan sama): lolos; tabel berisi Teramati bukan templat", out)
+        ubah = (salin.replace("| K1 build | elf= berbeda dari sebelum flash |", "| K1 build | elf=048bd707 |")
+                .replace("| K3 | user: robot dimiringkan | - | - | TIDAK DIUJI |\n", "")
+                .replace("| S1 crash | 0 `Guru Meditation` | - | - | TIDAK DIUJI |\n", "")
+                .replace("| K2 A1 offset |", "| K2 A10 |"))
+        rc, out = jalan(p6, ubah, "REPORT-T.md")
+        cek(rc == 1 and "berbeda dari templat" in out and "elf=048bd707" in out and "baris templat \"S1 crash\"" in out
+            and "kriteria K3" in out and "baris templat \"K3\"" not in out,
+            "Harapan diubah dan baris templat hilang -> masalah (K3 hilang dilaporkan sekali oleh cek nomor K)", out)
+    else:
+        print("LEWAT uji v3.15: check_evidence.py versi lama")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")
