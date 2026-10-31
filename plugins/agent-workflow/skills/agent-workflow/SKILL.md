@@ -5,7 +5,7 @@ description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/p
 
 # Agent Workflow — Head + Executor untuk Project Apa Pun
 
-**Versi skill: 3.15.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
+**Versi skill: 3.16.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
 
 Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewat file di repo:
 - **Head** (perencana) menjaga arah, menganalisis hasil, memutuskan, mendesain, menulis task, dan memverifikasi.
@@ -14,14 +14,14 @@ Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewa
 Pola yang lazim: head memakai model paling pintar, executor memakai model yang lebih murah atau AI lokal. Karena itu protokol disetel ke **kapasitas executor** (§Kapasitas Executor), bukan satu ukuran untuk semua. Hasil akhirnya adalah **file di project user** (instruksi peran, protokol, ROADMAP), bukan nasihat umum. Tulis file dalam bahasa yang dipakai user; skill ini sendiri berbahasa Indonesia, dan tag penanda serta kata kunci alat membuat protokol berbahasa lain tetap terbaca skrip (§3, Isi file).
 
 File pendukung di folder skill ini dibaca hanya saat dibutuhkan:
-- `references/templates.md`: template T1–T9 dan penyesuaian per jenis project.
+- `references/templates.md`: template T1–T10 dan penyesuaian per jenis project.
 - `references/structure.md`: standar struktur file per jenis project, survei, log bukti, dan cara memindah file dengan aman.
 - `references/enforcement.md`: resep penegakan per tool.
 - `scripts/check_secrets.py`, `scripts/check_evidence.py`, dan `scripts/record.py`: alat cek secret generik (pola umum + nilai asli dari file secret lokal, tanpa mencetak nilainya), pemeriksa bukti report (kutipan `file:baris`, status OK terhadap harapan, asal log, kelengkapan kriteria), dan pembungkus perintah yang menyimpan log bukti beserta catatan asalnya. Ketiganya disalin ke project oleh BOOTSTRAP/AUDIT.
 - `scripts/screenshot.py`: tangkapan layar halaman web di beberapa ukuran layar dengan emulasi perangkat, ditambah pengukur halaman dan elemen yang lebih lebar dari layar. Disalin ke project ber-UI.
 - `references/changelog.md` dan `scripts/check_version.py`: perubahan per versi (file sasaran, cara patch, penanda), dan skrip yang membandingkan penanda itu dengan isi project, termasuk apakah instruksi tiap peran bisa ditemukan tool-nya. Dipakai jalur upgrade di AUDIT; skripnya dijalankan dari folder skill, tidak disalin ke project.
 - `references/low-capacity.md` dan `scripts/calibrate.py`: executor RENDAH (bukti dari skrip, ukuran task, rantai task) dan uji kalibrasi model baru. Skrip kalibrasi dijalankan dari folder skill; seed-nya disimpan di luar folder project, dan hasil penilaiannya diarsipkan ke `handoff/logs/`.
-- `references/orca.md`: head yang menjalankan executor lewat Orca, yaitu peluncuran per task dengan model pilihan head, setelan izin agen, kalibrasi lewat Orca, dan uji sebelum dipakai. Dibaca bila project memakai Orca.
+- `references/orca.md` dan `scripts/orca_wait.py`: head yang menjalankan executor lewat Orca, yaitu peluncuran per task dengan model pilihan head, setelan izin agen, kalibrasi lewat Orca, dan uji sebelum dipakai, ditambah alat tunggu yang meng-ack heartbeat worker tanpa membangunkan head (disalin ke `handoff/tools/`). Dibaca bila project memakai Orca.
 
 Aturan di sini lahir dari kegagalan nyata di tiga project lapangan, yang disebut menurut jenisnya:
 - **Robot meja** (firmware ESP32): sekitar 30 dari 42 task berupa pengukuran ulang, dan bug kritis yang sudah tertulis di dokumen audit baru ditemukan 11 hari kemudian.
@@ -98,7 +98,7 @@ Jelaskan mode yang dipilih beserta alasannya. Dua agen menambah latensi, karena 
     - Model dan effort diambil dari setelan sesi, dan task seperti itu tidak dihitung sebagai bukti kapasitas.
 24. **Protokol yang benar di atas kertas bisa gagal di mesin nyata.**
     - Contoh dari robot meja: langkah penutup `graphify update .` gagal di empat report karena perintahnya tidak ada di PATH (yang jalan `python -m graphify`). `git status` di Periksa Diri hampir tidak pernah bersih karena hook graphify menulis ulang `graphify-out/` setelah setiap commit. `/<prefix>-head` juga tidak pernah terdaftar di Claude Code, karena instruksinya hanya ada di `.agents/skills/`; head tetap jalan selama ada yang menyuruhnya membaca file itu.
-    - Jalankan setiap perintah protokol sekali saat menulisnya, catat berkas yang berubah sendiri, dan pastikan setiap tool yang menjalankan sebuah peran bisa menemukan instruksinya.
+    - Jalankan setiap perintah protokol sekali saat menulisnya, catat berkas yang berubah sendiri, dan pastikan setiap tool yang menjalankan sebuah peran bisa menemukan instruksinya. Uji jalan juga bisa meleset dari pemakaian nyata. Contoh dari aplikasi budidaya: loop tunggu Orca v3.14 lolos uji jalan, tetapi setiap heartbeat worker tetap membangunkan head yang konteksnya ±456 ribu token. Head menganggapnya wajar dan tidak mencatatnya, jadi celah itu baru ketahuan dari transkrip sesi. Karena itu head mencatat celah skill di `handoff/SKILL-FEEDBACK.md` saat menemukannya.
 25. **Test yang lulus tidak membuktikan tampilan.**
     - Contoh dari aplikasi budidaya: audit peramban head menemukan cacat di 4 dari 5 task UI yang lolos test. Tiga di antaranya cacat tampilan: tombol terlalu kecil, tab keluar layar, dan panel terlalu lebar. Dua task lolos fungsi tetapi meleset dari mockup.
     - Kriteria tampilan ditulis bisa dicek: rujukan mockup dan ukuran layar sasaran. Yang terukur dinilai skrip audit peramban; yang butuh mata dinilai head dari tangkapan layar (`head:`) atau oleh user (`user:`).
@@ -143,8 +143,8 @@ handoff/
 ├── ROADMAP.md            arah (T4)
 ├── NOTES.md              keadaan sekarang + register keputusan (T5)
 ├── STRUCTURE.md          peta struktur file project (T9)
-├── PROMPT_HEAD.md        prompt pembuka untuk tool tanpa dukungan skill (T7)
-├── PROMPT_EXECUTOR.md
+├── SKILL-FEEDBACK.md     celah skill yang dicatat head, dibaca saat upgrade (T10)
+├── PROMPT_*.md           prompt pembuka head dan executor untuk tool tanpa dukungan skill (T7)
 ├── tasks/                TASK-NNN-<slug>.md, mulai dari TASK-001 SMOKE
 ├── reports/              REPORT-NNN.md (REPORT_TEMPLATE.md = T6)
 ├── logs/                 bila ada log mentah
@@ -166,7 +166,7 @@ handoff/
 - **Alat cek bukti.** Salin `scripts/check_evidence.py` dan `scripts/record.py` ke `handoff/tools/` untuk setiap project yang punya executor. Format bukti yang dicek ada di REPORT_TEMPLATE (T6). Executor menyimpan output bukti lewat `record.py` (asal log tercatat di `handoff/logs/provenance.jsonl`) dan menjalankan `check_evidence.py` sebelum DONE; head menjalankannya lagi saat triase. Kedua skrip ini juga tidak dihitung dalam batas 7 file.
 - **Perintah dicek jalan.** Setiap perintah yang ditulis ke protokol (build, test, alat di `handoff/tools/`, langkah penutup seperti `graphify update`) dijalankan sekali di mesin ini, dan yang ditulis adalah bentuk yang jalan. Perintah di file aturan agen buatan tool lain (mis. `.agents/rules/graphify.md`) ikut dicek; bila gagal, bentuk yang jalan ditambahkan sebagai catatan di file itu. Perintah yang tidak boleh dijalankan agen (flash, deploy, migrasi) ditandai `belum dicek`.
 - **Cek tampilan.** Project ber-UI: salin `scripts/screenshot.py` ke `handoff/tools/`, tulis perintahnya beserta ukuran layar sasaran di README §Lingkungan (T3, baris **Cek tampilan**), lalu jalankan sekali dan lihat hasilnya. Halaman yang butuh server (mis. `vite preview`) atau perangkat ditulis dengan langkah menyalakannya; layanan live diblokir dengan `--offline`. Jangan memotret lebar HP dengan `chrome --headless --window-size` biasa: Chrome desktop menata halaman minimal ±500 px lalu memotong fotonya. Tanpa Chrome, Chromium, atau Edge, jadikan Tugas User: cek di perangkat nyata (`user:`).
-- **Executor lewat Orca.** Bila head menjalankan executor lewat Orca, ikuti `references/orca.md`. Profil Executor mencatat peluncuran Orca per model, setelan izin agen dipilih bersama user (untuk project yang punya operasi berisiko, `Full access` hanya bila user menerima risikonya, dan task yang menyentuh operasi itu tidak lewat Orca), satu dispatch baca-saja dijalankan sebelum task pertama, dan head menunggu tanpa bangun berkala atau bekerja paralel di wilayah file lain. Tanpa Orca, bagian **Executor lewat Orca** (T1) dan **Dijalankan lewat Orca** (T2a/T2b) dihapus.
+- **Executor lewat Orca.** Bila head menjalankan executor lewat Orca, ikuti `references/orca.md`. Profil Executor mencatat peluncuran Orca per model, setelan izin agen dipilih bersama user (untuk project yang punya operasi berisiko, `Full access` hanya bila user menerima risikonya, dan task yang menyentuh operasi itu tidak lewat Orca), satu dispatch baca-saja dijalankan sebelum task pertama, dan head menunggu tanpa bangun berkala atau bekerja paralel di wilayah file lain. Salin `scripts/orca_wait.py` ke `handoff/tools/`; head menunggu dengan alat itu, sehingga heartbeat worker tidak membangunkannya. Tanpa Orca, bagian **Executor lewat Orca** (T1) dan **Dijalankan lewat Orca** (T2a/T2b) dihapus.
 
 **Lokasi instruksi per tool**
 
@@ -217,7 +217,7 @@ Diagnosis dulu, ubah setelah disetujui.
    - Fitur yang ditunda karena menunggu masalah lain.
    - Item dokumen arah/audit lama: apakah masih ada di kode? (fungsi + `file:baris`)
    - Batasan yang sudah lama diinvestigasi: bandingkan spec dengan keadaan nyata (Pelajaran 13).
-   - Jalan pintas user, sebagai tanda protokol terlalu kaku.
+   - Jalan pintas user, sebagai tanda protokol terlalu kaku, dan celah yang dicatat head di `handoff/SKILL-FEEDBACK.md`.
    - **Tool/model yang berganti sejak bootstrap.** Bila ada, jalankan checklist migrasi di bawah.
 2. **Sampaikan** akar masalah beserta buktinya, hal yang dipertahankan, dan rencana perubahan. Template sasaran ada di `references/templates.md`.
    - Putaran tanya AUDIT (§2) berisi satu konfirmasi gabungan untuk jawaban yang sudah tercatat, termasuk tool/model yang dipakai sekarang. Ditambah maksimal 3 keputusan hasil diagnosis, mis. kapasitas, fokus baru, atau penegakan.
@@ -226,7 +226,7 @@ Diagnosis dulu, ubah setelah disetujui.
    - Bila NOTES sudah menjadi log (lebih dari ±10 baris per topik), riwayat dipindah **verbatim** ke `NOTES_ARCHIVE.md` lewat skrip, lalu dicek identik dengan versi git. Bila NOTES masih ringkas, cukup dirapikan.
    - Aturan user dipertahankan apa adanya. Klarifikasi yang menggeser maknanya, termasuk perubahan pembagian peran yang melonggarkan aturan lama (misalnya head kini boleh build atau menulis patch), ditandai "perlu persetujuan user".
    - **Pagar pengaman lama dipertahankan** dan disebutkan ulang di protokol baru. Instruksi basi atau bertentangan yang ditemukan **diperbaiki**, termasuk rule always-on.
-   - Alat cek secret dipasang ke `handoff/tools/` bila belum ada dan project punya file secret (cara di §3). Alat cek bukti dan `record.py` juga dipasang bila belum ada.
+   - Alat cek secret dipasang ke `handoff/tools/` bila belum ada dan project punya file secret (cara di §3). Alat cek bukti dan `record.py` juga dipasang bila belum ada, begitu juga `orca_wait.py` bila head memakai Orca.
    - Secret yang ditemukan dihapus dari file protokol. Bila sudah terlanjur masuk riwayat git, buat Tugas User untuk mengganti kuncinya.
    - Pekerjaan user yang belum di-commit dibiarkan. Commit hanya file protokol, setelah user setuju.
    - Penolakan hook/izin tidak diakali (Pelajaran 14).
@@ -240,16 +240,16 @@ Diagnosis dulu, ubah setelah disetujui.
 - [ ] Bila memakai Orca: peluncuran per model di Profil Executor, setelan izin agen, dan dispatch baca-saja (`references/orca.md`)
 
 **Jalur upgrade.** Dipakai bila user hanya meminta upgrade, atau bila versi efektif project lebih lama dari versi skill ini.
-1. Jalankan `python <folder skill>/scripts/check_version.py` dari root project (atau dengan path-nya sebagai argumen). Bila lebih dari dua penanda dasar (v2.1) hilang, lakukan audit penuh, bukan upgrade per baris.
+1. Jalankan `python <folder skill>/scripts/check_version.py` dari root project (atau dengan path-nya sebagai argumen). Bila lebih dari dua penanda dasar (v2.1) hilang, lakukan audit penuh, bukan upgrade per baris. Baca juga `handoff/SKILL-FEEDBACK.md` (LITE: di samping NOTES): entri yang dijawab versi ini ditangani bersama patch-nya, dan entri lain disampaikan ke user sebagai usulan untuk skill.
 2. Untuk setiap penanda yang hilang, baca baris ID-nya di `references/changelog.md`: file sasaran, cara patch, dan perlu-tidaknya persetujuan.
 3. Saring dengan §Kualitas Rekomendasi. Yang tidak sepadan untuk project ini dilewati, dan alasannya ditulis.
 4. Patch seminimal mungkin di file sasaran, mengikuti bahasa dan gaya file project.
    - Jangan menulis ulang file. Aturan user dan pagar lama dipertahankan.
    - Aturan yang dipatch membawa tag `<!-- aw: ID -->` dari template. Aturan lama yang sudah dikenali lewat teksnya tidak perlu ditambahi tag.
-   - Skrip yang disalin ke project (`check_evidence.py`, `check_secrets.py`, `record.py`) dibandingkan dulu dengan versi skill. Salinan bernama lama (sebelum v3.12, mis. `cek_bukti.py`) di-`git mv` dulu ke nama barunya (padanan di changelog v3.12). Tambalan lokal dibawa ke skill atau dipertahankan, jangan ditimpa. Contohnya tambalan kutipan user karangan di `check_evidence.py` aplikasi budidaya, yang masuk skill di v3.9, dan pola token bot Telegram `check_secrets.py` aplikasi budidaya (v3.9.1). Isi `SECRET_FILES` dibawa dari salinan lama.
+   - Skrip yang disalin ke project (`check_evidence.py`, `check_secrets.py`, `record.py`, `orca_wait.py`) dibandingkan dulu dengan versi skill. Salinan bernama lama (sebelum v3.12, mis. `cek_bukti.py`) di-`git mv` dulu ke nama barunya (padanan di changelog v3.12). Tambalan lokal dibawa ke skill atau dipertahankan, jangan ditimpa. Contohnya tambalan kutipan user karangan di `check_evidence.py` aplikasi budidaya, yang masuk skill di v3.9, dan pola token bot Telegram `check_secrets.py` aplikasi budidaya (v3.9.1). Isi `SECRET_FILES` dibawa dari salinan lama.
    - Patch yang menggeser makna aturan user ditandai "perlu persetujuan user".
 5. Perbarui penanda versi di kepala README (LITE: skill dev), lalu jalankan `check_version.py` lagi. Penanda yang dipatch harus berstatus "ada".
-6. Ringkasan berisi patch yang dipasang, yang dilewati beserta alasannya, dan yang menunggu persetujuan. Commit setelah user setuju.
+6. Ringkasan berisi patch yang dipasang, yang dilewati beserta alasannya, yang menunggu persetujuan, dan entri `SKILL-FEEDBACK.md` beserta Status barunya (`ditangani v<versi>` atau `ditolak: <alasan>`). Commit setelah user setuju.
 
 ### 5. LITE
 Buat satu skill `<prefix>-dev` (T8) ditambah `ROADMAP.md` dan `NOTES.md`. Gerbang arah, verifikasi item di kode, hipotesis berlabel, dan SMOKE ringan tetap dipakai. Tawarkan naik ke dua agen bila nanti muncul pekerjaan panjang, atau bila user ingin executor yang lebih murah.
@@ -319,7 +319,7 @@ Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rek
 - **Yang tetap dijaga:** test acceptance tidak diubah executor, review head mencakup file baru (`git status --porcelain`), dan brief menolak task di atas kapasitas tanpa jalur ad-hoc.
 
 ## Template, Struktur & Penegakan
-- **Template** T1–T9, placeholder, dan penyesuaian per jenis project ada di `references/templates.md`. Baca file itu sebelum BOOTSTRAP/LITE, dan saat AUDIT bila butuh struktur sasaran.
+- **Template** T1–T10, placeholder, dan penyesuaian per jenis project ada di `references/templates.md`. Baca file itu sebelum BOOTSTRAP/LITE, dan saat AUDIT bila butuh struktur sasaran.
 - **Standar struktur** per jenis project, survei, aturan log bukti, dan cara memindah file ada di `references/structure.md`. Baca file itu saat BOOTSTRAP, AUDIT, dan mode STRUKTUR.
 - **Alat cek secret** generik ada di `scripts/check_secrets.py`. Cara memasangnya ada di §3.
 - **Changelog dan cek versi** (`references/changelog.md` + `scripts/check_version.py`) dipakai jalur upgrade di §4.

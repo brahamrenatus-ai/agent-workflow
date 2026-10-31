@@ -19,6 +19,7 @@ Every rule comes from a failure seen in real projects, recorded in the skill's *
 - UI tasks passed their tests while the screens were wrong (buttons too small, tabs off-screen). Visual criteria are now checked from screenshots.
 - A second session re-ran a finished task and overwrote the first session's evidence logs. Executors now stop on tasks that are not `OPEN`, and the log wrapper refuses to overwrite logs of finished tasks.
 - A trial of launching executors through [Orca](https://github.com/stablyai/orca) looked successful, but Orca's "Full access" setting had started the executor with `--dangerously-skip-permissions`, and a standby Claude Code terminal sat at the bypass-mode consent dialog. The head now checks the launcher's permission setting and reads the model from the launch receipt, not from the request.
+- A head waiting on an Orca worker was still woken by every worker heartbeat: its wait listened for some message types only, and Orca types a notice into the coordinator's terminal for every other type. Each wake re-read a context of about 456k tokens, and the head treated it as normal. The head now waits with a bundled script that acknowledges heartbeats itself, and records gaps like this in `handoff/SKILL-FEEDBACK.md` so they reach the next upgrade.
 
 ## What it does
 
@@ -31,7 +32,7 @@ Every rule comes from a failure seen in real projects, recorded in the skill's *
 
 Executor capacity has three levels (TINGGI/SEDANG/RENDAH, i.e. high/medium/low). Each level changes how tasks are written, how much design freedom the executor gets, and how deeply the head verifies. A new model can be placed with a 15-minute **calibration test** scored by a script.
 
-Capacity is tracked **per model**, so one project can use several executor models across tools (for example Gemini Flash in Antigravity for routine work, Claude in Claude Code for harder tasks). The head picks the model for each task: the cheapest one whose capacity is enough, following the user's preference order, and writes the reason in the task. With **Orca**, the head also launches that model itself (`orca orchestration worker-start`), waits for `worker_done`, and still triages the report from files; see `references/orca.md`. Tool-permission prompts and usage-limit dialogs only show in the worker terminal, so the head reads it between waits, and Claude workers run under the head session's own Claude account. While a worker runs, the head waits with one background wait instead of waking every few minutes (each wake re-reads its whole context), or keeps working in another part of the codebase.
+Capacity is tracked **per model**, so one project can use several executor models across tools (for example Gemini Flash in Antigravity for routine work, Claude in Claude Code for harder tasks). The head picks the model for each task: the cheapest one whose capacity is enough, following the user's preference order, and writes the reason in the task. With **Orca**, the head also launches that model itself (`orca orchestration worker-start`), waits for `worker_done`, and still triages the report from files; see `references/orca.md`. Tool-permission prompts and usage-limit dialogs only show in the worker terminal, so the head reads it between waits, and Claude workers run under the head session's own Claude account. While a worker runs, the head waits with `orca_wait.py` in the background instead of waking every few minutes (each wake re-reads its whole context), or keeps working in another part of the codebase.
 
 ### Bundled scripts
 
@@ -41,6 +42,7 @@ Capacity is tracked **per model**, so one project can use several executor model
 | `check_evidence.py` | yes | Checks a report against its evidence: every `file:line` quote (also quotes in prose such as the Anomalies section), every OK against its expected value, log provenance (including logs overwritten by a different command), that each acceptance criterion has a row, and that expected values copied from a task's data-table template were not changed. `--at <commit>` / `--at-report` check old reports against the files as they were. Reads Indonesian or English reports. |
 | `check_secrets.py` | yes, if the project has local secret files | Finds secrets in files before commit by pattern and by the actual values from your local secret files, without printing them. `--staged`, `--redact`. |
 | `screenshot.py` | yes, if the project has a web UI | Screenshots a page at target screen sizes using real device emulation through the Chrome DevTools Protocol, and reports the page width and any element that sticks out of the screen (exit 1 if so). `--offline` blocks every host except localhost. |
+| `orca_wait.py` | yes, if the head launches executors through Orca | Waits for Orca worker messages in the background without waking the head: acknowledges heartbeat-only batches itself, drops Orca's keepalive frames, and exits on any other message (`PESAN`), an error (`GALAT`), or after 36 minutes (`TIMEOUT`, with each dispatch's last heartbeat). |
 | `check_version.py` | no (run from the skill folder, in the project root or with its path as the argument) | Compares the project's protocol with the changelog markers, reports the effective version and the patches still missing. |
 | `calibrate.py` | no | Builds and scores the calibration test for a new executor model. |
 
@@ -74,7 +76,7 @@ The skill is written in Indonesian, with English file, script, and option names 
 
 ## Versioning and upgrades
 
-The skill version is in `SKILL.md` and `references/changelog.md`. Each version lists the rules it adds to projects, with target file, patch method, and a marker. A generated `handoff/README.md` records the skill version it was built with. To upgrade a project, run the skill in AUDIT mode: it runs `check_version.py`, patches only the missing rules, keeps your own rules and local script patches, and asks before committing.
+The skill version is in `SKILL.md` and `references/changelog.md`. Each version lists the rules it adds to projects, with target file, patch method, and a marker. A generated `handoff/README.md` records the skill version it was built with. To upgrade a project, run the skill in AUDIT mode: it runs `check_version.py`, patches only the missing rules, keeps your own rules and local script patches, and asks before committing. The head records gaps it finds in the skill (wrong or missing rules, checks that missed a problem, wasted time or tokens, its own slips the protocol did not prevent) in `handoff/SKILL-FEEDBACK.md`; the upgrade reads that file and marks each entry handled or declined.
 
 ## Development
 

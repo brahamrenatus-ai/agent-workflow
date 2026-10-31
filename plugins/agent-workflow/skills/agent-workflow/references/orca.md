@@ -14,7 +14,7 @@ Ditulis dengan Orca 1.4.243 dan dicek ulang dengan 1.4.244. Panduan yang cocok d
 - **Sesi head bukan pekerja Orca**, karena head adalah sesi interaktif user. Sesi lain, mis. pengembang skill, boleh membaca terminal head atau mengirim kabar lewat Orca atas izin user, tetapi tidak mengawasinya. Yang teramati dengan Orca 1.4.244:
   - `orca terminal send --enter` ke terminal Claude Code yang sedang menampilkan dialog (izin, trust, pengaturan) ditolak dengan `agent_prompt_blocked`. `orca terminal read` bisa tidak menampilkan dialog itu bila tampilannya tergulir. Minta user menjawab dialognya, lalu kirim ulang dengan `orca terminal send --retry-request <id>` memakai id dari galat itu.
   - `orca orchestration send --type escalation` hanya diterima dari worker yang memegang dispatch-nya; dari koordinator atau sesi lain ditolak `sender_not_assignee`. Kabar dari sesi lain memakai `--type status`.
-  - Orca mengetik pemberitahuan pesan baru (juga untuk heartbeat) ke terminal koordinator, dan pemberitahuan itu membangunkan sesi head.
+  - Orca mengetik pemberitahuan pesan baru ("You have N orchestration message") ke terminal koordinator untuk pesan yang jenisnya tidak ada di filter waiter yang sedang aktif (`check --wait --types`). Selama ada waiter tanpa `--types`, tidak ada pemberitahuan sama sekali. Pemberitahuan ditahan selama sesi koordinator bekerja, lalu dikirim begitu sesinya menganggur, dan membangunkannya.
 
 ## Profil Executor sebagai tabel pilihan
 Contoh baris (T3 §Profil Executor):
@@ -40,7 +40,7 @@ Untuk Antigravity, hanya `Full access` yang mengubah perilakunya. Dengan setelan
 ## Sebelum task pertama (dicek jalan)
 1. `orca status --json`: runtime `ready`. `orca repo list --json` memuat root project. Bila belum, daftarkan dengan `orca repo add --path <root>`; folder tanpa git didaftarkan lewat `orca project setup-existing-folder`.
 2. Setelan izin agen dicek bersama user, lalu dicatat di Profil Executor (penanda D6) dan register keputusan.
-3. **Dispatch baca-saja**, satu untuk setiap agen yang akan dipakai. Spec-nya menjalankan `check_evidence.py` atas report terakhir dan `git status --porcelain`, tanpa mengubah file apa pun. Sesudah worker selesai:
+3. **Dispatch baca-saja**, satu untuk setiap agen yang akan dipakai, ditunggu dengan `handoff/tools/orca_wait.py` (salin dulu `scripts/orca_wait.py` milik skill ini). Spec-nya menjalankan `check_evidence.py` atas report terakhir dan `git status --porcelain`, tanpa mengubah file apa pun. Sesudah worker selesai:
    - isi `worker_done` cocok dengan hasil yang didapat head saat menjalankan ulang perintah yang sama;
    - `launch.effective` di receipt sama dengan yang diminta;
    - mode izin terlihat di terminal worker (Claude Code menampilkannya di baris status), termasuk apakah agen meminta konfirmasi untuk perintah biasa;
@@ -56,7 +56,10 @@ Model baru di tabel diuji kalibrasi dengan model dan effort yang akan dipakai (`
 
 ## Menunggu dan bekerja paralel
 Setiap kali head bangun, seluruh konteks sesinya dibaca ulang. Di satu project lapangan, head dengan konteks ±175 ribu token yang bangun tiap 2 menit memakai 32 panggilan API dalam 19 menit pemantauan, setara ±1 juta token input, sementara kode task-nya ditulis executor tanpa token Claude. Di project yang sama, satu task yang dikerjakan head sendiri dengan konteks rata-rata ±480 ribu token memakai 169 panggilan, setara ±10,6 juta token input.
-- Head menunggu dengan satu loop latar belakang yang baru selesai bila ada pesan, galat, atau sesudah empat putaran (T1 butir **Tunggu tanpa bangun berkala**). Dicek jalan 2026-10-30: tanpa pesan, loop berputar diam; pesan atau galat membuatnya langsung selesai. Heartbeat cukup di-ack.
+- Head menunggu dengan `handoff/tools/orca_wait.py` di latar belakang (salinan `scripts/orca_wait.py`; T1 butir **Tunggu tanpa bangun berkala**). Alat itu menunggu tanpa `--types`, meng-ack sendiri batch yang isinya hanya heartbeat, dan selesai bila ada pesan lain, galat, atau sesudah 36 menit.
+- Loop v3.14 menunggu dengan `--types "worker_done,escalation,question"`, sehingga setiap heartbeat worker membangunkan head. Di aplikasi budidaya ada 14 kali dalam dua hari, masing-masing 3 panggilan API dengan konteks ±456 ribu token (±1,37 juta token cache per heartbeat). Head menganggapnya wajar ("bisa diabaikan") dan tidak mencatatnya.
+- Dicek jalan 2026-10-31 dengan sesi koordinator yang menganggur. Dengan `orca_wait.py`, 3 heartbeat di-ack tanpa satu pun pemberitahuan, lalu `worker_done` mengakhiri penantian. Dengan loop v3.14, heartbeat diikuti pemberitahuan 1 detik kemudian. `check --wait --json` juga menulis bingkai keepalive ke stderr setiap 15 detik (141 baris untuk loop 36 menit); alat itu membuangnya.
+- **Setelan heartbeat** ada di Settings Orca, panel Orchestration: "Worker heartbeats" dan "Heartbeat interval" (1–60 menit, bawaan 5). Setelan ini berlaku untuk worker yang di-dispatch sesudah perubahan, dan preamble worker menyebut intervalnya. Dengan `orca_wait.py`, heartbeat tidak membangunkan head pada interval berapa pun.
 - Selama worker bekerja, head boleh terus bekerja di wilayah file lain (T1 butir **Kerja paralel head dan worker**). Executor mengabaikan wilayah itu saat Periksa Diri, dan sumber daya bersama (DB uji, port, perangkat) dipegang task worker.
 - Bila wilayahnya tidak bisa dipisah, worker dijalankan di worktree sendiri (`--worktree new-child`) dan digabung sesudah triase. Worktree baru belum berisi dependensi (mis. `node_modules`) dan file yang tidak ter-track, termasuk file secret, jadi siapkan dulu atau tuliskan di task.
 - Sesi head baru sesudah triase memangkas biaya bila konteks sudah besar; keadaan project ada di `handoff/`.

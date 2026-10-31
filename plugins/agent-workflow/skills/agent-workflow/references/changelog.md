@@ -299,6 +299,20 @@ Perubahan lain tanpa penanda baru: `check_evidence.py` menghitung nomor baris se
 | H2 | Hasil kerja head di luar repo (Artifact, kanvas desain, purwarupa, dokumen di layanan lain) dirujuk di dokumen rancangan atau ROADMAP saat dibuat: tautan, nama akun pemilik, keputusan user dalam kata-kata; sumber yang menjadi dasar implementasi disalin ke repo, bukan ke scratchpad sesi | instruksi head / skill dev (LITE) | T1 langkah 5 (butir **Hasil di luar repo**) / T8 langkah 5 | – |
 | Y8 | `check_evidence.py` memeriksa kutipan di prosa (`teks` (`file:baris`) ke file log), templat tabel Data di task, dan log yang ditimpa dengan perintah lain; nomor baris dihitung seperti grep | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py`, setelah dibandingkan dengan salinan project (tambalan lokal dipertahankan); tambahkan kalimat format kutipan di prosa ke REPORT_TEMPLATE §Ringkasan Fakta dan brief executor (T6, T2a langkah 4) | – |
 
+## v3.16 (2026-10-31): heartbeat tidak membangunkan head, celah skill dicatat head
+Berasal dari sesi head aplikasi budidaya yang dilihat atas permintaan user, sehari sesudah v3.14 dipakai. Ada tiga hal:
+- Selama executor bekerja lewat Orca, setiap heartbeat worker (bawaan Orca setiap 5 menit) membangunkan head, padahal butir D11 dibuat supaya head tidak bangun berkala. Orca mengetik pemberitahuan pesan ke terminal koordinator untuk pesan yang jenisnya tidak ditunggu, sedangkan loop D11 menunggu dengan `--types "worker_done,escalation,question"`. Setiap kali bangun, head menjalankan check, ack, dan menulis satu kalimat laporan: 3 panggilan API dengan konteks ±456 ribu token, 14 kali dalam dua hari. Head menganggapnya wajar dan meminta user mengabaikan pemberitahuan itu.
+- Loop yang sama menulis bingkai keepalive Orca (stderr, setiap 15 detik) ke output tugas latar belakang. Untuk satu loop 36 menit ada 141 baris yang harus disaring head, dan tambalan head (`grep -v` pada stdout) tidak berefek.
+- Celah itu tidak tercatat di file project mana pun dan baru ketahuan dari transkrip sesi. Head punya tempat untuk kelalaian executor (Kebiasaan gagal), keputusan (register), dan usulan project (Kotak Usulan), tetapi tidak untuk celah skill atau kelalaiannya sendiri.
+
+Perubahan lain tanpa penanda baru: `references/orca.md` (aturan pemberitahuan Orca, hasil uji jalan 2026-10-31, setelan heartbeat, dispatch baca-saja ditunggu dengan `orca_wait.py`), butir D7 di T1 (putaran pendek dengan `orca_wait.py --minutes 2`), template T10, dan jalur upgrade di `SKILL.md` (membaca `SKILL-FEEDBACK.md` dan mengisi Status-nya).
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| D12 | Head menunggu dengan `handoff/tools/orca_wait.py` (tanpa `--types`; batch yang isinya hanya heartbeat di-ack alat itu), bukan dengan loop `--types`. Selama alat itu berjalan, pemberitahuan yang tetap masuk dijawab satu baris tanpa menjalankan perintah | instruksi head | T1 §Executor lewat Orca (butir **Tunggu tanpa bangun berkala**: loop Bash diganti alat itu) | – |
+| Y9 | Alat tunggu Orca terpasang di project | `handoff/tools/orca_wait.py` | Salin `scripts/orca_wait.py` | – |
+| Q2 | Head (LITE: skill dev) mencatat celah skill di `handoff/SKILL-FEEDBACK.md` (LITE: di samping NOTES): aturan atau alat yang keliru, kurang, atau boros, alat cek yang meloloskan masalah, dan kelalaian head yang tidak dicegah protokol | instruksi head / skill dev (LITE) (+ `handoff/SKILL-FEEDBACK.md`) | T1 langkah 5 (butir **Celah skill**) / T8 langkah 7; buat file dari T10 | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -416,4 +430,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.15 P6    executor~templat tabel Data
 3.15 H2    head~Hasil di luar repo || dev~Hasil di luar repo
 3.15 Y8    file:handoff/tools/check_evidence.py~def cek_prosa
+3.16 D12   head~orca_wait.py  @bila_orca
+3.16 Y9    ada~handoff/tools/orca_wait.py  @bila_orca
+3.16 Q2    head~SKILL-FEEDBACK.md || dev~SKILL-FEEDBACK.md
 ```

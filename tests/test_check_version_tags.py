@@ -64,9 +64,9 @@ def buat(root, executor="T2a", dengan_tag=True, ui=True):
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(isi, encoding="utf-8")
-    for s in ("record.py", "check_evidence.py", "check_secrets.py", "screenshot.py"):
+    for s in ("record.py", "check_evidence.py", "check_secrets.py", "screenshot.py", "orca_wait.py"):
         (root / "handoff/tools").mkdir(parents=True, exist_ok=True)
-        if (SKILL / "scripts" / s).is_file():  # screenshot.py ada sejak v3.10.1
+        if (SKILL / "scripts" / s).is_file():  # screenshot.py ada sejak v3.10.1, orca_wait.py sejak v3.16
             shutil.copy(SKILL / "scripts" / s, root / "handoff/tools" / s)
     subprocess.run(["git", "init", "-q"], cwd=root, capture_output=True)
 
