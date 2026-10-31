@@ -313,6 +313,18 @@ Perubahan lain tanpa penanda baru: `references/orca.md` (aturan pemberitahuan Or
 | Y9 | Alat tunggu Orca terpasang di project | `handoff/tools/orca_wait.py` | Salin `scripts/orca_wait.py` | – |
 | Q2 | Head (LITE: skill dev) mencatat celah skill di `handoff/SKILL-FEEDBACK.md` (LITE: di samping NOTES): aturan atau alat yang keliru, kurang, atau boros, alat cek yang meloloskan masalah, dan kelalaian head yang tidak dicegah protokol | instruksi head / skill dev (LITE) (+ `handoff/SKILL-FEEDBACK.md`) | T1 langkah 5 (butir **Celah skill**) / T8 langkah 7; buat file dari T10 | – |
 
+## v3.17 (2026-10-31): head mengukur konteksnya dan menyarankan sesi baru
+Berasal dari aplikasi budidaya dan permintaan user ("jika contextnya udah besar head harus menyarankan sendiri melakukan clear"):
+- Sesi head mencapai ±456–478 ribu token, padahal butir D11 sudah menyuruh head memulai sesi baru di atas ±200 ribu. Head tidak bisa melihat ukuran konteksnya, dan tidak bisa menjalankan `/clear` sendiri, jadi aturan itu tidak pernah memicu apa pun. Aturan itu juga hanya ada di bagian Orca, sehingga head tanpa Orca tidak mendapatkannya.
+- Ringkas otomatis bukan penggantinya: sesudah diringkas, Claude Code hanya membawa 5.000 token pertama setiap skill yang pernah dipanggil (dokumentasi Claude Code, siklus hidup isi skill), sedangkan instruksi head jauh lebih panjang.
+
+Perubahan lain tanpa penanda baru: kalimat sesi baru di butir D11 kini merujuk ke `context_size.py` dan butir **Ukuran konteks**, dan `references/orca.md` §Menunggu dan bekerja paralel menyebut alat itu.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| Q3 | Head (LITE: skill dev) menjalankan `context_size.py` sesudah setiap triase dan commit, dan sebelum pekerjaan besar berikutnya. Bila hasilnya BESAR (lebih dari 200 ribu token), ia tidak memulai pekerjaan baru dan menyarankan user menjalankan `/clear` lalu skill head, dengan angka ukurannya | instruksi head / skill dev (LITE) | T1 langkah 5 (butir **Ukuran konteks**) / T8 langkah 8 | – |
+| Y10 | Alat ukur konteks terpasang di project | `handoff/tools/context_size.py` | Salin `scripts/context_size.py` | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -433,4 +445,6 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.16 D12   head~orca_wait.py  @bila_orca
 3.16 Y9    ada~handoff/tools/orca_wait.py  @bila_orca
 3.16 Q2    head~SKILL-FEEDBACK.md || dev~SKILL-FEEDBACK.md
+3.17 Q3    head~Ukuran konteks || dev~Ukuran konteks
+3.17 Y10   ada~handoff/tools/context_size.py
 ```

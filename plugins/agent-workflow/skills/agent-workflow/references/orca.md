@@ -62,7 +62,7 @@ Setiap kali head bangun, seluruh konteks sesinya dibaca ulang. Di satu project l
 - **Setelan heartbeat** ada di Settings Orca, panel Orchestration: "Worker heartbeats" dan "Heartbeat interval" (1–60 menit, bawaan 5). Setelan ini berlaku untuk worker yang di-dispatch sesudah perubahan, dan preamble worker menyebut intervalnya. Dengan `orca_wait.py`, heartbeat tidak membangunkan head pada interval berapa pun.
 - Selama worker bekerja, head boleh terus bekerja di wilayah file lain (T1 butir **Kerja paralel head dan worker**). Executor mengabaikan wilayah itu saat Periksa Diri, dan sumber daya bersama (DB uji, port, perangkat) dipegang task worker.
 - Bila wilayahnya tidak bisa dipisah, worker dijalankan di worktree sendiri (`--worktree new-child`) dan digabung sesudah triase. Worktree baru belum berisi dependensi (mis. `node_modules`) dan file yang tidak ter-track, termasuk file secret, jadi siapkan dulu atau tuliskan di task.
-- Sesi head baru sesudah triase memangkas biaya bila konteks sudah besar; keadaan project ada di `handoff/`.
+- Sesi head baru sesudah triase memangkas biaya bila konteks sudah besar; keadaan project ada di `handoff/`. Head mengukurnya dengan `handoff/tools/context_size.py` dan menyarankan `/clear` ke user (T1 butir **Ukuran konteks**). Sesi head aplikasi budidaya sempat mencapai ±478 ribu token tanpa menyarankannya.
 
 ## Batas
 - Orca tidak menggantikan bukti. `worker_done` hanya kabar; triase tetap memakai `check_evidence.py` dan verifikasi sesuai kapasitas.

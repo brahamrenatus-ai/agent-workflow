@@ -25,6 +25,7 @@ UJI = [
     ("test_redact_provenance", [S]),
     ("test_calibrate", [S]),
     ("test_orca_wait", [S]),
+    ("test_context_size", [S]),
     ("test_screenshot", [S]),  # dilewati bila Chrome, Chromium, atau Edge tidak ada
     ("test_orca_cli", [S]),  # dilewati bila Orca tidak terpasang
 ]
