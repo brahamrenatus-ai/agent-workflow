@@ -18,6 +18,7 @@ Yang dicek:
      memverifikasinya. Kutipan user yang sama dengan teks Harapan (≥ 4 kata) adalah masalah, karena pengamatan
      user tidak boleh dikarang;
    - nilai Teramati harus terlihat di salah satu baris yang dirujuk (tulis nilainya persis seperti di baris itu);
+     Teramati `kunci=nilai` juga cocok dengan `kunci nilai` dan `kunci: nilai` di baris itu, mis. `tests 328` dari test runner;
    - Harapan berbentuk `kunci=nilai`, `kunci<N`, `kunci>=N`, `=N`, `<N` (digabung dengan "dan" atau ";")
      dinilai otomatis; status OK yang bertentangan dengan hasilnya adalah masalah;
    - tabel task FAKTA (kolom Pertanyaan, Jawaban, Bukti, Status): DITEMUKAN butuh `file:baris` atau `hitung`,
@@ -47,6 +48,12 @@ yang sebenarnya memenuhi Harapan, report (selain BLOCKED) tanpa bagian Periksa D
 bernomor K, angka bersatuan (mis. `3-6 detik`, `7,20:1`, `45%`) di Ringkasan Fakta, Keputusan Implementasi,
 atau Anomali tanpa rujukan `file:baris` di baris yang sama dan tanpa tanda perkiraan/HIPOTESIS, dan log yang
 dirujuk report tetapi ditimpa dengan perintah lain (menurut provenance.jsonl; `--append` tidak dihitung).
+Tiga peringatan lain juga dari provenance.jsonl (v3.18):
+- baris OK yang merujuk log dengan kode keluar bukan 0, kecuali baris itu menyebut kode keluarnya (`exit 1`,
+  `kode_keluar=1`) atau menandainya uji merah;
+- log yang perintahnya sama dengan run sebelumnya yang gagal lalu tertimpa (ulang sampai hijau), walau disebut di
+  Anomali: jumlah run dan run yang gagal hanya terlihat di provenance.jsonl, jadi head yang mencocokkannya;
+- log dari perintah yang memakai path sementara (scratchpad, Temp, /tmp), karena skrip di sana tidak bisa diperiksa ulang.
 
 Rujukan `file:baris` boleh berupa path dari root repo, atau nama file saja bila tepat satu file bernama itu
 ada di handoff/logs/. Beberapa baris dari satu file: `file:12, 40, 41`, atau `file:12`, `:40` di sel yang sama.
@@ -128,6 +135,10 @@ SPAN = re.compile(r"`([^`\n]+)`")
 PERINTAH = re.compile(r"^(?:&\s*)?(?:git|python3?|py|node|npm|npx|pnpm|yarn|pio|pip|cd|bash|sh|pwsh|powershell|cmd|curl|docker|"
                       r"make|cargo|go|dotnet|flutter|adb|orca|claude|agy|select-string|get-\w+)(?:\s|$)", re.I)
 ELISI = re.compile(r"\s*(?:\.\.\.|…)\s*")
+# Provenance (v3.18): path sementara di perintah, dan baris tabel yang mengakui kode keluar bukan 0.
+SEMENTARA = re.compile(r"[\\/](?:scratchpad|temp|tmp)[\\/]", re.I)
+AKUI_KELUAR = re.compile(r"(?:\bexit(?:[ _]?code)?|\bkode[ _]keluar)\D{0,3}(\d+)", re.I)
+AKUI_MERAH = re.compile(r"\b(?:merah|red)\b", re.I)
 
 
 def siapkan_output():
@@ -194,6 +205,37 @@ def muat_asal(berkas):
     return asal
 
 
+def kode_gagal(rec):
+    return rec.get("kode_keluar") not in (0, None)
+
+
+def pisah_run(riwayat):
+    """(catatan yang tertimpa, catatan yang isinya ada di log sekarang) dari riwayat satu log.
+    Isi log sekarang berasal dari run terakhir tanpa --append, ditambah --append sesudahnya; redact bukan run."""
+    runs = [r for r in riwayat if r.get("jenis") != "redact"]
+    awal = max((i for i, r in enumerate(runs) if not r.get("tambah")), default=0)
+    return runs[:awal], runs[awal:]
+
+
+def cek_kode_keluar(no, baris, refs, berkas, asal, hasil):
+    """Baris OK yang merujuk log gagal (v3.18). Pola lapangan: alat uji mencetak lulus=20/20 tetapi keluar 1 karena
+    syarat keluarnya masih 19, dan Harapan tidak menuntut kode keluar. Uji merah yang diharapkan diakui di barisnya."""
+    if asal is None:
+        return
+    dilihat = set()
+    for nama, _ in refs:
+        p, _ = berkas.cari(nama)
+        rel = berkas.rel(p) if p else None
+        if not rel or rel in dilihat or not rel.lower().startswith("handoff/logs/"):
+            continue
+        dilihat.add(rel)
+        kode = [r.get("kode_keluar") for r in pisah_run(asal.get(rel.lower(), []))[1] if kode_gagal(r)]
+        if not kode or AKUI_MERAH.search(baris) or str(kode[-1]) in AKUI_KELUAR.findall(baris):
+            continue
+        hasil.peringatan(no, f"status OK merujuk {rel}, padahal perintahnya keluar dengan kode {kode[-1]} (provenance); bila "
+                             "kegagalan itu memang diharapkan, sebut kode keluarnya di baris ini; bila tidak, ubah statusnya")
+
+
 def cek_asal(dirujuk, berkas, asal, wajib, hasil):
     """Log di handoff/logs/ yang dirujuk report harus tercatat record.py dengan hash yang sama."""
     if asal is None:
@@ -224,6 +266,18 @@ def cek_asal(dirujuk, berkas, asal, wajib, hasil):
             hasil.peringatan(0, f"log {rel} ditimpa dengan perintah lain: `{a.get('perintah', '?')}` ({a.get('mulai', '?')}) -> "
                                 f"`{b.get('perintah', '?')}` ({b.get('mulai', '?')}); sebut alasannya di Anomali, "
                                 "atau simpan output tiap perintah di log bernama sendiri")
+        # Ulang sampai hijau (v3.18): run yang gagal tertimpa, jadi hanya provenance yang menyimpannya.
+        lama, kini = pisah_run(riwayat)
+        if kini and not any(kode_gagal(r) for r in kini):
+            sama = [r for r in lama if r.get("perintah") == kini[0].get("perintah")]
+            gagal = sum(kode_gagal(r) for r in sama)
+            if gagal:
+                hasil.peringatan(0, f"log {rel}: perintah yang sama dijalankan {len(sama) + 1} kali, {gagal} run lebih dulu gagal "
+                                    "lalu tertimpa (provenance); sebut jumlah run dan penyebabnya di Anomali")
+        sementara = next((r for r in kini if SEMENTARA.search(r.get("perintah", ""))), None)
+        if sementara:
+            hasil.peringatan(0, f"log {rel} dibuat perintah yang memakai path sementara: `{sementara.get('perintah')}`; "
+                                "skrip di sana tidak bisa diperiksa ulang. Simpan alatnya di repo, atau jalankan perintah di task")
 
 
 def cek_kriteria(path_report, data, berkas, hasil):
@@ -581,7 +635,8 @@ def terlihat(teramati, baris_bukti):
     gabung = [tanpa_spasi_sama(b) for b in baris_bukti]
     token = TOKEN.findall(teramati)
     if token:
-        return all(any(re.search(rf"(?<![\w.]){re.escape(k)}={re.escape(v)}(?![\w.])", g) for g in gabung) for k, v in token)
+        # Kunci dan nilai boleh dipisah `=`, `:`, atau spasi: test runner mencetak `tests 328`, bukan `tests=328`.
+        return all(any(re.search(rf"(?<![\w.]){re.escape(k)}(?:=|:\s*|\s+){re.escape(v)}(?![\w.])", g) for g in gabung) for k, v in token)
     return any(rapi(teramati) in rapi(b) for b in baris_bukti)
 
 
@@ -629,7 +684,7 @@ def sel(baris):
     return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", s)]
 
 
-def cek_tabel(tabel, berkas, hasil, data=None):
+def cek_tabel(tabel, berkas, hasil, data=None, asal=None):
     (_, header), rows = tabel[0], tabel[2:]
     h = [c.lower() for c in sel(header)]
 
@@ -683,6 +738,8 @@ def cek_tabel(tabel, berkas, hasil, data=None):
                 hasil.masalah(no, "status OK tanpa rujukan file:baris di kolom Bukti")
             continue
         bukti = [b for b in (ambil_baris(no, nama, n, berkas, hasil) for nama, n in refs) if b is not None]
+        if status == "OK":
+            cek_kode_keluar(no, baris, refs, berkas, asal, hasil)
         teramati = ambil("teramati")
         if bukti and not ada_hitung and not fakta and rapi(teramati) not in ("", "-") and not terlihat(teramati, bukti):
             hasil.masalah(no, f"Teramati \"{rapi(teramati)}\" tidak terlihat di baris yang dirujuk")
@@ -841,7 +898,7 @@ def periksa(path_report, berkas, asal=None, wajib_asal=False):
                 j += 1
             tabel = [(k + 1, baris[k]) for k in range(i, j)]
             if len(tabel) >= 3 and re.match(r"^\s*\|?\s*:?-{3,}", tabel[1][1]):
-                ada_tabel = cek_tabel(tabel, berkas, hasil, data) or ada_tabel
+                ada_tabel = cek_tabel(tabel, berkas, hasil, data, asal) or ada_tabel
             i = j
             continue
         s = t.strip()

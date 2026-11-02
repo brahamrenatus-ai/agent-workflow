@@ -15,11 +15,14 @@ Output diawali satu kata:
   model tidak bisa menjalankan `/clear` sendiri. Ringkas otomatis bukan pengganti: sesudah diringkas, Claude Code
   hanya membawa 5.000 token pertama setiap skill;
 - TIDAK DIKETAHUI: bukan sesi Claude Code, atau transkripnya tidak ditemukan.
-Kode keluar 0 untuk ketiganya (2 untuk argumen salah).
+Bila handoff/ROADMAP.md §1 (serah terima, sejak v3.18) lebih besar dari --handoff-limit KB, baris kedua diawali RAPIKAN.
+Bagian itu dibaca ulang setiap sesi head baru, dan tumbuh tiap serah terima bila ditulis sebagai catatan harian.
+Kode keluar 0 untuk semua hasil ini (2 untuk argumen salah).
 """
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -71,30 +74,46 @@ def ribuan(n):
     return f"{n:,}".replace(",", ".")
 
 
+def ukuran_serah_terima(path=Path("handoff") / "ROADMAP.md"):
+    """Ukuran §1 ROADMAP dalam byte; None bila file atau bagiannya tidak ada. Nomor bagian netral bahasa."""
+    if not path.is_file():
+        return None
+    m = re.search(r"^##\s*1\b[^\n]*\n(.*?)(?=^##\s|\Z)", path.read_text(encoding="utf-8", errors="replace"), re.M | re.S)
+    return len(m.group(1).encode("utf-8")) if m else None
+
+
+def ukur_konteks(limit):
+    """Baris hasil ukur konteks sesi: diawali AMAN, BESAR, atau TIDAK DIKETAHUI."""
+    sesi = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    if not sesi:
+        return "TIDAK DIKETAHUI: variabel CLAUDE_CODE_SESSION_ID tidak ada (bukan dijalankan dari sesi Claude Code)."
+    path = cari_transkrip(sesi)
+    if not path:
+        return f"TIDAK DIKETAHUI: transkrip sesi {sesi} tidak ditemukan di {folder_konfigurasi() / 'projects'}."
+    token, waktu = konteks_terakhir(path)
+    if token is None:
+        return f"TIDAK DIKETAHUI: belum ada pesan asisten bertoken di {path.name}."
+    rinci = f"konteks sesi ini {ribuan(token)} token (pesan terakhir {waktu[:19] or '?'}), batas {ribuan(limit)}"
+    if token > limit:
+        return (f"BESAR: {rinci}. Sesudah triase dan commit, sarankan user menjalankan /clear lalu skill head; "
+                "keadaan ada di handoff/.")
+    return f"AMAN: {rinci}."
+
+
 def main():
     p = argparse.ArgumentParser(description="Ukur konteks sesi Claude Code yang menjalankan skrip ini.")
     p.add_argument("--limit", type=int, default=200000, help="batas saran sesi baru, dalam token (bawaan 200000)")
+    p.add_argument("--handoff-limit", type=int, default=8, help="batas ROADMAP §1, dalam KB (bawaan 8)")
     args = p.parse_args()
     if args.limit <= 0:
         p.error("--limit harus lebih dari 0")
-    sesi = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    if not sesi:
-        print("TIDAK DIKETAHUI: variabel CLAUDE_CODE_SESSION_ID tidak ada (bukan dijalankan dari sesi Claude Code).")
-        return 0
-    path = cari_transkrip(sesi)
-    if not path:
-        print(f"TIDAK DIKETAHUI: transkrip sesi {sesi} tidak ditemukan di {folder_konfigurasi() / 'projects'}.")
-        return 0
-    token, waktu = konteks_terakhir(path)
-    if token is None:
-        print(f"TIDAK DIKETAHUI: belum ada pesan asisten bertoken di {path.name}.")
-        return 0
-    rinci = f"konteks sesi ini {ribuan(token)} token (pesan terakhir {waktu[:19] or '?'}), batas {ribuan(args.limit)}"
-    if token > args.limit:
-        print(f"BESAR: {rinci}. Sesudah triase dan commit, sarankan user menjalankan /clear lalu skill head; "
-              "keadaan ada di handoff/.")
-    else:
-        print(f"AMAN: {rinci}.")
+    if args.handoff_limit <= 0:
+        p.error("--handoff-limit harus lebih dari 0")
+    print(ukur_konteks(args.limit))
+    serah = ukuran_serah_terima()
+    if serah is not None and serah > args.handoff_limit * 1024:
+        print(f"RAPIKAN: ROADMAP §1 {(serah + 1023) // 1024} KB, batas {args.handoff_limit} KB. Tulis ulang sebagai keadaan terkini: "
+              "yang selesai dihapus, keputusan ke register NOTES, item ke Backlog; riwayatnya tetap ada di git.")
     return 0
 
 

@@ -395,6 +395,79 @@ try:
             "Harapan diubah dan baris templat hilang -> masalah (K3 hilang dilaporkan sekali oleh cek nomor K)", out)
     else:
         print("LEWAT uji v3.15: check_evidence.py versi lama")
+    if "def cek_kode_keluar" in SKRIP.read_text(encoding="utf-8"):  # sejak v3.18
+        p8 = tmp / "proj8"
+        (p8 / "handoff/reports").mkdir(parents=True)
+        (p8 / "scratchpad").mkdir()
+        CATAT8 = SKRIP.parent / "record.py"
+        # alat.py <nama> <n>: n run pertama untuk nama itu keluar 1, sesudahnya keluar 0; output selalu sama.
+        (p8 / "alat.py").write_text(
+            "import pathlib, sys\nnama, gagal = sys.argv[1], int(sys.argv[2])\np = pathlib.Path(nama + '.n')\n"
+            "n = int(p.read_text()) if p.exists() else 0\np.write_text(str(n + 1))\n"
+            "print('lulus=20/20')\nsys.exit(1 if n < gagal else 0)\n", encoding="utf-8")
+        (p8 / "scratchpad/bungkus.py").write_text("print('hasil=7')\n", encoding="utf-8")
+
+        def catat8(log, perintah, *opsi):
+            subprocess.run([sys.executable, str(CATAT8), *opsi, f"handoff/logs/{log}", f'"{sys.executable}" {perintah}'],
+                           cwd=p8, capture_output=True)
+
+        catat8("satu.log", "alat.py a 1")
+        catat8("ulang.log", "alat.py b 2")
+        catat8("ulang.log", "alat.py b 2")
+        catat8("ulang.log", "alat.py b 2")
+        catat8("beda.log", "alat.py c 9")
+        catat8("beda.log", "alat.py d 0")
+        catat8("tambah.log", "alat.py e 1")
+        catat8("tambah.log", "alat.py e 1", "--append")
+        catat8("bersih.log", "alat.py f 0")
+        catat8("bungkus.log", f'"{p8 / "scratchpad/bungkus.py"}"')
+        (p8 / "handoff/logs/tap.log").write_text("# tests 328\n# pass: 328\n# fail 0\n", encoding="utf-8")
+        data = "# REPORT-8\n## Data yang Diminta\n" + TABEL
+        tutup = "\n## Periksa Diri\n- ok\n"
+
+        rc, out = jalan(p8, data + "| K1 persiapan | lulus=20/20 | lulus=20/20 | `handoff/logs/satu.log:1` | OK |\n" + tutup)
+        cek(rc == 0 and "PERINGATAN baris 5: status OK merujuk handoff/logs/satu.log" in out and "keluar dengan kode 1" in out,
+            "baris OK merujuk log berkode keluar 1 -> peringatan (pola alat uji mencetak lulus tetapi keluar gagal)", out)
+        rc, out = jalan(p8, data + "| K1 tanpa cek ulang (exit 1) | lulus=20/20 | lulus=20/20 | `handoff/logs/satu.log:1` | OK |\n"
+                        "| K2 uji merah sebelum perbaikan | lulus=20/20 | lulus=20/20 | `handoff/logs/satu.log:1` | OK |\n"
+                        "| K3 kode_keluar=1 diharapkan | lulus=20/20 | lulus=20/20 | `handoff/logs/satu.log:1` | OK |\n" + tutup)
+        cek(rc == 0 and "keluar dengan kode" not in out, "baris yang mengakui kode keluar atau uji merah: tanpa peringatan", out)
+        rc, out = jalan(p8, data + "| K1 lulus (exit 0) | lulus=20/20 | lulus=20/20 | `handoff/logs/satu.log:1` | OK |\n" + tutup)
+        cek("keluar dengan kode 1" in out, "baris menyebut kode keluar yang salah (exit 0, nyatanya 1): tetap peringatan", out)
+        rc, out = jalan(p8, data + "| K1 persiapan | lulus=20/20 | lulus=19/20 | `handoff/logs/satu.log:1` | GAGAL |\n" + tutup)
+        cek("keluar dengan kode" not in out, "baris GAGAL yang merujuk log gagal: tanpa peringatan kode keluar", out)
+        rc, out = jalan(p8, data + "| K1 bersih | lulus=20/20 | lulus=20/20 | `handoff/logs/bersih.log:1` | OK |\n" + tutup)
+        cek(rc == 0 and "kode" not in out and "gagal" not in out.replace("GAGAL", ""), "log kode keluar 0 sekali jalan: tanpa peringatan baru", out)
+
+        rc, out = jalan(p8, data + "| K1 ulang | lulus=20/20 | lulus=20/20 | `handoff/logs/ulang.log:1` | OK |\n" + tutup)
+        cek(rc == 0 and "dijalankan 3 kali, 2 run lebih dulu gagal" in out and "keluar dengan kode" not in out,
+            "perintah sama diulang sampai hijau: peringatan menyebut jumlah run dan run gagal", out)
+        rc, out = jalan(p8, data + "| K1 ulang | lulus=20/20 | lulus=20/20 | `handoff/logs/ulang.log:1` | OK |\n"
+                        "\n## Anomali / Pertanyaan\n- ulang.log dijalankan ulang karena gagal.\n" + tutup)
+        cek("2 run lebih dulu gagal" in out, "disebut di Anomali tetap peringatan: head mencocokkan jumlah run dengan provenance", out)
+        rc, out = jalan(p8, data + "| K1 beda | lulus=20/20 | lulus=20/20 | `handoff/logs/beda.log:1` | OK |\n" + tutup)
+        cek("ditimpa dengan perintah lain" in out and "lebih dulu gagal" not in out, "perintah berbeda: peringatan lama saja, bukan ulang sampai hijau", out)
+        rc, out = jalan(p8, data + "| K1 tambah | lulus=20/20 | lulus=20/20 | `handoff/logs/tambah.log:1` | OK |\n" + tutup)
+        cek("lebih dulu gagal" not in out and "keluar dengan kode 1" in out,
+            "--append: isi run gagal masih ada di log, jadi bukan tertimpa; baris OK tetap diperingatkan", out)
+        asal8 = p8 / "handoff/logs/provenance.jsonl"
+        catatan = asal8.read_text(encoding="utf-8").splitlines()
+        akhir = next(l for l in reversed(catatan) if "ulang.log" in l)
+        asal8.write_text("\n".join(catatan + [akhir.replace('"jenis": "log"', '"jenis": "redact"')]) + "\n", encoding="utf-8")
+        rc, out = jalan(p8, data + "| K1 ulang | lulus=20/20 | lulus=20/20 | `handoff/logs/ulang.log:1` | OK |\n" + tutup)
+        cek("dijalankan 3 kali, 2 run lebih dulu gagal" in out, "catatan redact bukan run: jumlah run tidak bertambah", out)
+
+        rc, out = jalan(p8, data + "| K1 bungkus | hasil=7 | hasil=7 | `handoff/logs/bungkus.log:1` | OK |\n" + tutup)
+        cek(rc == 0 and "memakai path sementara" in out and "bungkus.py" in out, "log dari skrip di scratchpad: peringatan path sementara", out)
+        rc, out = jalan(p8, data + "| K1 bersih | lulus=20/20 | lulus=20/20 | `handoff/logs/bersih.log:1` | OK |\n" + tutup)
+        cek("path sementara" not in out, "perintah di repo: tanpa peringatan path sementara", out)
+
+        rc, out = jalan(p8, data + "| K1 tests | tests=328 dan pass=328 dan fail=0 | tests=328 dan pass=328 dan fail=0 | `handoff/logs/tap.log:1, 2, 3` | OK |\n" + tutup)
+        cek(rc == 0 and "tidak terlihat" not in out, "Teramati kunci=nilai cocok dengan `tests 328` dan `pass: 328` di log (tanda palsu REPORT-071)", out)
+        rc, out = jalan(p8, data + "| K1 tests | tests=329 | tests=329 | `handoff/logs/tap.log:1` | OK |\n" + tutup)
+        cek(rc == 1 and "tidak terlihat" in out, "nilai yang berbeda tetap tidak terlihat", out)
+    else:
+        print("LEWAT uji v3.18: check_evidence.py versi lama")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")

@@ -64,7 +64,7 @@ def buat(root, executor="T2a", dengan_tag=True, ui=True):
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(isi, encoding="utf-8")
-    for s in ("record.py", "check_evidence.py", "check_secrets.py", "screenshot.py", "orca_wait.py", "context_size.py"):
+    for s in ("record.py", "check_evidence.py", "check_secrets.py", "screenshot.py", "orca_wait.py", "context_size.py", "head_restart.py"):
         (root / "handoff/tools").mkdir(parents=True, exist_ok=True)
         if (SKILL / "scripts" / s).is_file():  # screenshot.py ada sejak v3.10.1, orca_wait.py sejak v3.16, context_size.py sejak v3.17
             shutil.copy(SKILL / "scripts" / s, root / "handoff/tools" / s)
@@ -142,10 +142,10 @@ try:
         f = tmp / "orca"
         buat(f)
         p = f / "handoff/README.md"
-        p.write_text(p.read_text(encoding="utf-8") + "- Executors are launched by the head through Orca.\n", encoding="utf-8")
+        p.write_text(p.read_text(encoding="utf-8") + "- Executors are launched with `orca orchestration worker-start`.\n", encoding="utf-8")
         rc, out = jalan(f)
         cek(rc == 0 and "| Orca: ada" in out and f"Versi efektif: v{versi}" in out,
-            "README menyebut Orca, aturan Orca bertag: syarat terpenuhi dan D4–D6 dikenali lewat tag", out)
+            "README memuat perintah Orca, aturan Orca bertag: syarat terpenuhi dan D4–D6 dikenali lewat tag", out)
         for rel in (".claude/skills/demo-head/SKILL.md", ".claude/skills/demo-executor/SKILL.md", "handoff/README.md"):
             p = f / rel
             p.write_text(re.sub(r"\b(D4|D5|D6)\b", "XX", p.read_text(encoding="utf-8")), encoding="utf-8")
@@ -155,15 +155,22 @@ try:
         g = tmp / "orca_di_head"
         buat(g)
         p = g / ".claude/skills/demo-head/SKILL.md"
-        p.write_text(p.read_text(encoding="utf-8") + "Dispatch executors with ORCA.\n", encoding="utf-8")
+        p.write_text(p.read_text(encoding="utf-8") + "Dispatch executors with ORCA ORCHESTRATION worker-start.\n", encoding="utf-8")
         rc, out = jalan(g)
-        cek(rc == 0 and "| Orca: ada" in out, "kata Orca di instruksi head juga memenuhi syarat (tanpa peka huruf besar-kecil)", out)
+        cek(rc == 0 and "| Orca: ada" in out, "perintah Orca di instruksi head juga memenuhi syarat (tanpa peka huruf besar-kecil)", out)
         p = g / "handoff/README.md"
         p.write_text(p.read_text(encoding="utf-8") + "- Model orcanet-7b; whales: orcas.\n", encoding="utf-8")
         p = g / ".claude/skills/demo-head/SKILL.md"
         p.write_text(p.read_text(encoding="utf-8").replace("ORCA", "orcanet"), encoding="utf-8")
         rc, out = jalan(g)
         cek("| Orca: tidak ada" in out, "kata yang hanya memuat 'orca' (orcanet, orcas) tidak dihitung", out)
+        h = tmp / "orca_kata"
+        buat(h)
+        p = h / "handoff/README.md"
+        p.write_text(p.read_text(encoding="utf-8") + "- Peluncuran Orca: tidak dipakai di project ini.\n", encoding="utf-8")
+        rc, out = jalan(h)
+        if "TANDA_ORCA" in CEK.read_text(encoding="utf-8"):  # sejak v3.18
+            cek("| Orca: tidak ada" in out, "kata Orca tanpa perintahnya tidak memenuhi syarat @bila_orca (kandidat palsu v3.16)", out)
     if "tiada~" in CEK.read_text(encoding="utf-8"):  # penanda nama lama ada sejak v3.12
         n = tmp / "nama_lama"
         buat(n)

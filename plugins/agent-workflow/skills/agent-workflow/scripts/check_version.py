@@ -18,8 +18,9 @@ penanda itu. Tag ikut tersalin dari template, jadi aturan tetap dikenali walau p
 Penanda `tiada~path` ada bila file itu tidak ada; dipakai untuk nama lama yang harus sudah diganti (v3.12).
 Penanda yang file sasarannya tidak ada (mis. instruksi executor di project LITE) dicatat "n/a", bukan "hilang".
 Penanda bersyarat juga "n/a" bila syaratnya tidak terpenuhi: `@bila_secret` (project punya file secret lokal),
-`@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop), dan `@bila_orca` (README handoff atau
-instruksi head menyebut Orca, yaitu head menjalankan executor lewat Orca).
+`@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop), dan `@bila_orca` (head menjalankan executor
+lewat Orca: README handoff atau instruksi head memuat perintah `orca orchestration` atau `orca terminal`). Kata Orca
+saja tidak memenuhi syarat ini.
 Path project boleh folder mana pun di dalam repo-nya; yang diperiksa root repo itu. Tanpa path, folder kerja dipakai.
 Exit code: 0 = semua penanda yang berlaku ada, 1 = ada yang hilang, 2 = argumen salah atau path tidak ada.
 """
@@ -50,6 +51,8 @@ UI_NPM = {"react", "react-dom", "vue", "svelte", "@sveltejs/kit", "@angular/core
 UI_FILE = ["*.html", "*.vue", "*.svelte", "*.jsx", "*.tsx", "*.xaml", "*.storyboard", "*.qml", "*.ui",
            "AndroidManifest.xml"]
 TAG = re.compile(r"<!--\s*aw:([^>]*?)-->", re.I)
+# Tanda head memakai Orca (syarat @bila_orca, v3.18): perintahnya, yang sama dalam bahasa protokol apa pun.
+TANDA_ORCA = re.compile(r"\borca\s+(?:orchestration|terminal)\b", re.I)
 # Folder yang dipindai tiap tool untuk menemukan instruksi peran (SKILL.md §3, Lokasi instruksi per tool).
 TOOL_PERAN = {
     "Claude Code": [".claude/skills/*{peran}*/SKILL.md"],
@@ -135,10 +138,10 @@ def ada_ui(root):
 
 
 def ada_orca(root):
-    """True bila protokol mencatat bahwa head menjalankan executor lewat Orca: kata `Orca` di handoff/README.md
-    atau di instruksi head. Orca sendiri tidak dipanggil, karena di Linux `orca` bisa berarti pembaca layar."""
-    return any(re.search(r"\borca\b", f.read_text(encoding="utf-8", errors="replace"), re.I)
-               for f in file_peran(root, "readme") + file_peran(root, "head"))
+    """True bila handoff/README.md atau instruksi head memuat perintah Orca. Kata `Orca` saja tidak cukup: protokol tanpa
+    Orca bisa menyebutnya (mis. kolom Peluncuran Orca yang kosong), lalu aturan Orca menjadi kandidat palsu. Orca sendiri
+    tidak dipanggil, karena di Linux `orca` bisa berarti pembaca layar."""
+    return any(TANDA_ORCA.search(f.read_text(encoding="utf-8", errors="replace")) for f in file_peran(root, "readme") + file_peran(root, "head"))
 
 
 def cocok(teks, isi):

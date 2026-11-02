@@ -27,14 +27,14 @@ def asisten(ts, inp, baca, tulis):
             "usage": {"input_tokens": inp, "cache_read_input_tokens": baca, "cache_creation_input_tokens": tulis, "output_tokens": 9}}}
 
 
-def jalankan(konfig, sesi, *args):
+def jalankan(konfig, sesi, *args, cwd=None):
     env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_SESSION_ID")}
     if konfig is not None:
         env["CLAUDE_CONFIG_DIR"] = str(konfig)
     if sesi is not None:
         env["CLAUDE_CODE_SESSION_ID"] = sesi
     r = subprocess.run([sys.executable, str(SKRIP), *args], capture_output=True, text=True, encoding="utf-8",
-                       errors="replace", env=env, timeout=60)
+                       errors="replace", env=env, timeout=60, cwd=cwd)
     return r.returncode, r.stdout + r.stderr
 
 
@@ -91,6 +91,26 @@ try:
     cek(rc == 2 and "--limit" in out, "--limit 0 ditolak (exit 2)", out)
     rc, out = jalankan(konfig, sesi, "--help")
     cek(rc == 0 and "--limit" in out, "--help menyebut --limit", out)
+
+    if "--handoff-limit" in SKRIP.read_text(encoding="utf-8"):  # sejak v3.18
+        proj = tmp / "proj"
+        (proj / "handoff").mkdir(parents=True)
+        rc, out = jalankan(konfig, sesi, cwd=proj)
+        cek(rc == 0 and "RAPIKAN" not in out, "tanpa ROADMAP: tanpa baris RAPIKAN", out)
+        roadmap = proj / "handoff/ROADMAP.md"
+        roadmap.write_text("# ROADMAP\n## 1. Tertunda\n" + "x" * 9000 + "\n## 3. Backlog\n" + "y" * 90000 + "\n", encoding="utf-8")
+        rc, out = jalankan(konfig, sesi, "--limit", "300000", cwd=proj)
+        cek(rc == 0 and out.startswith("AMAN:") and "\nRAPIKAN: ROADMAP §1 9 KB, batas 8 KB" in out,
+            "§1 9.001 byte > 8 KB: baris kedua RAPIKAN, baris pertama tetap AMAN (bagian lain tidak dihitung)", out)
+        rc, out = jalankan(konfig, None, cwd=proj)
+        cek(out.startswith("TIDAK DIKETAHUI") and "RAPIKAN" in out, "di luar sesi Claude Code RAPIKAN tetap dicetak", out)
+        rc, out = jalankan(konfig, sesi, "--handoff-limit", "20", cwd=proj)
+        cek(rc == 0 and "RAPIKAN" not in out, "--handoff-limit 20: tanpa RAPIKAN", out)
+        roadmap.write_text("# ROADMAP\n## 1. Tertunda\nsingkat\n## 3. Backlog\n" + "y" * 90000 + "\n", encoding="utf-8")
+        rc, out = jalankan(konfig, sesi, cwd=proj)
+        cek(rc == 0 and "RAPIKAN" not in out, "§1 pendek, ROADMAP panjang: tanpa RAPIKAN", out)
+        rc, out = jalankan(konfig, sesi, "--handoff-limit", "0", cwd=proj)
+        cek(rc == 2 and "--handoff-limit" in out, "--handoff-limit 0 ditolak (exit 2)", out)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

@@ -325,6 +325,35 @@ Perubahan lain tanpa penanda baru: kalimat sesi baru di butir D11 kini merujuk k
 | Q3 | Head (LITE: skill dev) menjalankan `context_size.py` sesudah setiap triase dan commit, dan sebelum pekerjaan besar berikutnya. Bila hasilnya BESAR (lebih dari 200 ribu token), ia tidak memulai pekerjaan baru dan menyarankan user menjalankan `/clear` lalu skill head, dengan angka ukurannya | instruksi head / skill dev (LITE) | T1 langkah 5 (butir **Ukuran konteks**) / T8 langkah 8 | – |
 | Y10 | Alat ukur konteks terpasang di project | `handoff/tools/context_size.py` | Salin `scripts/context_size.py` | – |
 
+## v3.18 (2026-11-02): provenance dicek, serah terima ringkas, sesi head baru otomatis
+Berasal dari survei keempat dan `handoff/SKILL-FEEDBACK.md` aplikasi budidaya (21 report lolos triase, 13 entri celah), diukur dari transkrip selama ±53 jam:
+- `check_evidence.py` meloloskan tiga pola yang hanya terlihat di `provenance.jsonl`: alat uji yang mencetak `lulus=20/20` tetapi keluar 1, `npm test` yang dijalankan 8 kali dengan 7 run gagal lalu tertimpa, dan log dari skrip pembungkus di scratchpad. Diukur atas semua report ketiga project sebelum ditulis: 11 baris OK merujuk log gagal (2 di antaranya uji merah yang disengaja), 8 log diulang sampai hijau, 3 log berpath sementara.
+- Aturan Q3 (v3.17) menurunkan konteks head dari ±257 ribu ke ±142 ribu token per panggilan, dengan harga 43 kali `/clear` manual dalam 53 jam. Batas 200 ribu tetap tepat: model biaya sederhana memberi titik terbaik 175–190 ribu. Karena itu yang dihilangkan adalah pengetikan manualnya.
+- ROADMAP §1 ditulis sebagai catatan harian dan tumbuh ±2 KB per sesi, dari 7 KB menjadi 48 KB dalam sehari sesudah diarsipkan manual. Bagian itu dibaca ulang setiap sesi baru, dan Q3 memperbanyak sesi baru.
+
+Perubahan lain tanpa penanda baru: syarat `@bila_orca` kini mencari perintah `orca orchestration` atau `orca terminal`, bukan kata Orca, sehingga protokol yang hanya menyebut kata itu tidak lagi mendapat kandidat palsu; Teramati `kunci=nilai` juga cocok dengan `kunci nilai` dan `kunci: nilai` di log (tanda palsu `tests 328` dari test runner).
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| Y11 | `check_evidence.py` memperingatkan baris OK yang merujuk log dengan kode keluar bukan 0, log yang perintah samanya gagal lalu tertimpa, dan log dari perintah berpath sementara | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py` | – |
+| Y12 | Head menindak tiga peringatan itu saat triase | instruksi head | T1 langkah 2 **Integritas bukti** | – |
+| Y13 | Executor menulis perintah yang diulang sesudah gagal beserta jumlah run-nya, dan uji merah menyebut kode keluarnya | instruksi executor | T2a langkah 5, T2b langkah 6 | – |
+| Y14 | `context_size.py` mengukur ROADMAP §1 dan mencetak `RAPIKAN` di atas 8 KB | `handoff/tools/context_size.py` | Salin ulang `scripts/context_size.py` | – |
+| H3 | ROADMAP §1 berisi keadaan terkini yang ditulis ulang tiap serah terima, bukan catatan harian | instruksi head, `handoff/ROADMAP.md` | T1 langkah 5 **Serah terima di ROADMAP §1**, keterangan §1 di T4; §1 yang sudah menjadi log dirapikan sekali | – |
+| P7 | Templat tabel Data juga untuk task masa percobaan model baru | instruksi head, `handoff/README.md` | T1 langkah 4 **Templat tabel Data**, T3 §Format Task | – |
+| F4 | Head memutuskan nasib rujukan sebelum menulisnya, dan path rujukan tidak ditulis di file task | instruksi head | T1 langkah 4 **Nasib rujukan** | – |
+| F5 | Harapan alat uji yang ditulis executor dihitung dari rujukan, atau alatnya ditulis head | instruksi head | T1 langkah 4 **Harapan alat uji** | – |
+| F6 | Kode yang disalin dari luar wilayah task disebut sumbernya | instruksi executor | T2a langkah 4, T2b langkah 2 | – |
+| K4 | Harapan posisi atau ukuran ditulis sebagai nilai absolut yang diukur dari rancangan | instruksi head | T1 langkah 4 **Task tampilan** | – |
+| K5 | Sebelum mengubah bentuk data, head mencari pencocok persis di test dan alat uji, lalu memasukkannya ke wilayah task | instruksi head | T1 langkah 4 | – |
+| G2 | Log dan folder bukti yang dirujuk report ikut commit triase | instruksi head | T1 langkah 5 **Isi commit** | – |
+| J3 | Perintah yang menyalakan server atau app uji ditulis bersama perintah mematikannya | instruksi head | T1 langkah 5 **Perintah baru** | – |
+| D13 | Sebelum mengubah file, sesi head mengurus task `IN_PROGRESS`: wilayahnya ditulis di header task atau dikirim ke worker | instruksi head | T1 langkah 1 | – |
+| D14 | Kriteria `git status` di task mengecualikan wilayah head | instruksi head | T1 butir **Kerja paralel head dan worker** | – |
+| Q4 | Head yang disetujui user memulai sesi baru sendiri lewat `head_restart.py` saat konteks BESAR | instruksi head | T1 butir **Sesi head baru otomatis** | Keputusan user: tulis di README, bawaan `tidak` |
+| Q5 | README mencatat keputusan user atas sesi head baru otomatis | `handoff/README.md` | T3 butir **Orca** | Keputusan user |
+| Y15 | Alat sesi head baru terpasang di project | `handoff/tools/head_restart.py` | Salin `scripts/head_restart.py` | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -447,4 +476,22 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.16 Q2    head~SKILL-FEEDBACK.md || dev~SKILL-FEEDBACK.md
 3.17 Q3    head~Ukuran konteks || dev~Ukuran konteks
 3.17 Y10   ada~handoff/tools/context_size.py
+3.18 Y11   file:handoff/tools/check_evidence.py~def cek_kode_keluar
+3.18 Y12   head~run lebih dulu gagal
+3.18 Y13   executor~jumlah run
+3.18 Y14   file:handoff/tools/context_size.py~def ukuran_serah_terima
+3.18 H3    head~Serah terima di ROADMAP
+3.18 P7    head~task masa percobaan
+3.18 F4    head~Nasib rujukan
+3.18 F5    head~Harapan alat uji
+3.18 F6    executor~disebut sumbernya
+3.18 K4    head~Harapan posisi  @bila_ui
+3.18 K5    head~pencocok persis
+3.18 G2    head~ikut commit triase
+3.18 J3    head~perintah mematikannya
+3.18 D13   head~executor bisa sedang bekerja
+3.18 D14   head~mengecualikan wilayah  @bila_orca
+3.18 Q4    head~head_restart.py  @bila_orca
+3.18 Q5    readme~Sesi head baru otomatis  @bila_orca
+3.18 Y15   ada~handoff/tools/head_restart.py  @bila_orca
 ```
