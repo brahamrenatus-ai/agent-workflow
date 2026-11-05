@@ -468,6 +468,61 @@ try:
         cek(rc == 1 and "tidak terlihat" in out, "nilai yang berbeda tetap tidak terlihat", out)
     else:
         print("LEWAT uji v3.18: check_evidence.py versi lama")
+    if "def cek_klaim_hitung" in SKRIP.read_text(encoding="utf-8"):  # sejak v3.18.1
+        p9 = tmp / "proj9"
+        for d in ("handoff/reports", "handoff/logs/raw", "handoff/logs/lain", "docs"):
+            (p9 / d).mkdir(parents=True)
+        subprocess.run(["git", "init", "-q"], cwd=p9, capture_output=True)
+        (p9 / ".gitignore").write_text("handoff/logs/raw/\n", encoding="utf-8")
+        (p9 / "handoff/logs/base.log").write_text("[10:00:00] [NET] err=0\n", encoding="utf-8")
+        (p9 / "handoff/logs/audit.log").write_text("butir a ok\nbutir b GALAT elemen kosong\n", encoding="utf-8")
+        (p9 / "handoff/logs/tabel.log").write_text(
+            "# Nilai SMOKE\n| Aksi | Waktu | Konfirmasi |\n|---|---|---|\n| #1 off 1 | 20:25:12 | - |\n"
+            "| #2 on 1 | 20:25:38 | +3.750 s |\n", encoding="utf-8")
+        (p9 / "handoff/logs/pantau.log").write_text("[PC 07:29:26] rst:0x1 (POWERON_RESET)\n", encoding="utf-8")
+        (p9 / "handoff/logs/raw/pantau.log").write_text("[PC 07:29:20] port dibuka\n", encoding="utf-8")
+        (p9 / "handoff/logs/dup.log").write_text("x\n", encoding="utf-8")
+        (p9 / "handoff/logs/lain/dup.log").write_text("x\n", encoding="utf-8")
+        (p9 / "docs/dok.md").write_text("## lokasi\ntabel lokasi\ntabel kolam\n", encoding="utf-8")
+        awal = "# REPORT-9\n## Data yang Diminta\n" + TABEL + "| K1 dasar | err=0 | err=0 | `handoff/logs/base.log:1` | OK |\n\n"
+        tutup = "\n## Periksa Diri\n- ok\n"
+
+        lampiran = ("### Lampiran K1\n| Item | Bukti dokumen | Kategori |\n|---|---|---|\n"
+                    "| `lokasi` | hitung(docs/dok.md, \"lokasi\")=0 | kode-saja |\n"
+                    "| `kolam` | hitung(docs/dok.md, \"kolam\")=1 | sama |\n")
+        rc, out = jalan(p9, awal + lampiran + tutup)
+        cek(rc == 1 and "klaim hitung(docs/dok.md, \"lokasi\")=0, padahal 2 baris" in out and "\"kolam\")=1" not in out,
+            "klaim hitung()=N di tabel lampiran FAKTA dihitung ulang: 0 padahal 2 -> masalah; klaim yang benar lolos", out)
+        prosa = ("## Ringkasan Fakta\n- Audit: `hitung(handoff/logs/audit.log, \"GALAT\")` = 0.\n"
+                 "- Singkat: `hitung(..., \"GALAT\")` = 0, isi log dibaca.\n"
+                 "- Benar: hitung(handoff/logs/audit.log, \"ok\") → 1.\n")
+        rc, out = jalan(p9, awal + prosa + tutup)
+        cek(rc == 1 and out.count("klaim hitung") == 1 and "\"GALAT\")=0, padahal 1 baris" in out,
+            "klaim hitung()=N di prosa dihitung ulang; lingkup yang disingkat `...` dilewati", out)
+        harapan = ("| Kriteria | Harapan | Catatan |\n|---|---|---|\n| K2 | `hitung(docs/dok.md, \"lokasi\")` = 5 | dicek head |\n\n"
+                   + TABEL + "| K3 kontrak | `hitung(docs/dok.md, \"kolam\")` = 1 | 1 baris | hitung(docs/dok.md, \"kolam\") | OK |\n")
+        rc, out = jalan(p9, awal + harapan + tutup)
+        cek(rc == 0 and "klaim hitung" not in out, "syarat hitung() di kolom Harapan bukan klaim hasil: tidak dihitung ulang", out)
+
+        rc, out = jalan(p9, awal + "## Anomali\n- Aksi #2 gagal tetapi diberi `Konfirmasi +3.750 s` (`handoff/logs/tabel.log:5`).\n"
+                        "- Waktu aksi #2: `Waktu 20:25:38` (`tabel.log:5`).\n" + tutup)
+        cek(rc == 0 and "tidak ada di baris" not in out,
+            "kutipan `<nama kolom> <isi sel>` dari baris tabel di log cocok (tanda palsu `Konfirmasi +3.750 s`)", out)
+        rc, out = jalan(p9, awal + "## Anomali\n- `Konfirmasi 20:25:38` (`handoff/logs/tabel.log:5`).\n" + tutup)
+        cek(rc == 1 and "tidak ada di baris yang dirujuk" in out, "nilai dari kolom lain tetap tidak cocok", out)
+
+        rc, out = jalan(p9, awal + "## Anomali\n- Reset lewat `--reset-com8` (`base.log:1`).\n"
+                        "- Boot: `rst:0x1 (POWERON_RESET)` (`pantau.log:1`).\n" + tutup)
+        cek(rc == 0 and "tidak ada di baris" not in out and "tidak dicek" not in out,
+            "nama opsi bukan kutipan; nama log yang salinan mentahnya diabaikan git merujuk salinan yang ter-track", out)
+        rc, out = jalan(p9, awal + "## Anomali\n- Boot: `rst:0x9` (`pantau.log:1`).\n" + tutup)
+        cek(rc == 1 and "tidak ada di baris yang dirujuk" in out,
+            "kutipan salah di log bernama ganda (salinan mentah diabaikan git) kini dicek -> masalah", out)
+        rc, out = jalan(p9, awal + "## Anomali\n- `ERR 42` (`hilang.log:3`).\n- `x` (`dup.log:1`).\n" + tutup)
+        cek(rc == 0 and out.count("tidak dicek") == 2 and "hilang.log tidak ada" in out and "ambigu" in out,
+            "kutipan prosa yang file lognya tidak ada atau namanya ambigu: peringatan, bukan dilewati diam-diam", out)
+    else:
+        print("LEWAT uji v3.18.1: check_evidence.py versi lama")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")

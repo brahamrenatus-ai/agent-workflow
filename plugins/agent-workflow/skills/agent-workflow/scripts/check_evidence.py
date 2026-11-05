@@ -42,7 +42,12 @@ Yang dicek:
    mis. `ka_err=0` (`handoff/logs/a.log:12`), harus ada di baris yang dirujuk bila rujukannya file log. Beberapa
    kutipan boleh berantai (`a` dan `b` (`a.log:3..4`)); rentang `:3..4`, `:3-4`, dan daftar `:3, 9` dicek sebagai
    satu kesatuan; `...` di tengah kutipan menandai potongan. Kutipan berangka yang tidak cocok adalah masalah, yang
-   tanpa angka peringatan. Kutipan perintah (`git ...`, `python ...`) dilewati.
+   tanpa angka peringatan. Kutipan perintah (`git ...`, `python ...`) dan nama opsi (`--reset`) dilewati. Bila baris
+   yang dirujuk baris tabel Markdown, kutipan `<nama kolom> <isi sel>` juga cocok (mis. `Konfirmasi +3.750 s`).
+   Kutipan yang tidak bisa dicek karena file lognya tidak ada atau namanya ambigu diberi peringatan (v3.18.1).
+8. Klaim `hitung(lingkup, "pola")=N` di luar kolom Bukti tabel kriteria, mis. di prosa atau di tabel lampiran task
+   FAKTA: N harus sama dengan jumlah baris yang cocok (v3.18.1). Kolom Harapan dan lingkup yang disingkat
+   (`hitung(..., "pola")`) tidak dicek; nilai yang tidak sama adalah masalah.
 Peringatan (tidak menggagalkan): klaim berhasil/lulus di luar tabel tanpa rujukan `file:baris`, status GAGAL
 yang sebenarnya memenuhi Harapan, report (selain BLOCKED) tanpa bagian Periksa Diri, kriteria task yang belum
 bernomor K, angka bersatuan (mis. `3-6 detik`, `7,20:1`, `45%`) di Ringkasan Fakta, Keputusan Implementasi,
@@ -56,7 +61,8 @@ Tiga peringatan lain juga dari provenance.jsonl (v3.18):
 - log dari perintah yang memakai path sementara (scratchpad, Temp, /tmp), karena skrip di sana tidak bisa diperiksa ulang.
 
 Rujukan `file:baris` boleh berupa path dari root repo, atau nama file saja bila tepat satu file bernama itu
-ada di handoff/logs/. Beberapa baris dari satu file: `file:12, 40, 41`, atau `file:12`, `:40` di sel yang sama.
+ada di handoff/logs/. Salinan yang diabaikan git (mis. log mentah di handoff/logs/raw/) tidak membuat nama itu
+ambigu bila hanya satu salinan yang tidak diabaikan (v3.18.1). Beberapa baris dari satu file: `file:12, 40, 41`, atau `file:12`, `:40` di sel yang sama.
 Nomor baris dihitung seperti grep dan editor: baris dipisah CR LF, LF, atau CR. Form feed dan pemisah Unicode lain
 (yang juga dipisah str.splitlines()) tidak memulai baris baru.
 
@@ -87,6 +93,8 @@ FILE = rf"(?:[A-Za-z]:[/\\])?(?:[\w.-]+[/\\])*[\w.-]+\.(?:{EKSTENSI})"
 REF = re.compile(rf"(?<![\w/.\\-])({FILE}):(\d+(?:\s*,\s*\d+)*)(?![\d:])", re.I)
 REF_LANJUT = re.compile(rf"(?<![\w/.\\-])({FILE}):(\d+(?:\s*,\s*\d+)*)(?![\d:])|(?<![\w/.\\-]):(\d+)(?![\d:])", re.I)
 HITUNG = re.compile(r"(?:hitung|count)\(\s*`?([^,`()]+?)`?\s*,\s*[\"'](.+?)[\"']\s*\)", re.I)
+# Hasil yang diklaim tepat sesudah `hitung(...)`: `=0`, `= 3`, `→ 3` (v3.18.1).
+KLAIM_HITUNG = re.compile(r"\s*`?\s*(?:==|=|→|->)\s*`?\s*(\d+)(?!\d|[.,]\d)")
 GREP_N = re.compile(rf"^\s*({FILE}):(\d+):(.*)$", re.I)
 BARIS_LOG = re.compile(r"^\s*(\[\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\]|\[[A-Z][A-Z0-9_]+\])")
 SEBUT_LOG = re.compile(rf"(?<![\w/.\\-])((?:handoff[/\\]logs[/\\])?(?:[\w.-]+[/\\])*[\w.-]+\.(?:log|txt|csv|out|jsonl))(?![\w:])", re.I)
@@ -135,6 +143,9 @@ SPAN = re.compile(r"`([^`\n]+)`")
 PERINTAH = re.compile(r"^(?:&\s*)?(?:git|python3?|py|node|npm|npx|pnpm|yarn|pio|pip|cd|bash|sh|pwsh|powershell|cmd|curl|docker|"
                       r"make|cargo|go|dotnet|flutter|adb|orca|claude|agy|select-string|get-\w+)(?:\s|$)", re.I)
 ELISI = re.compile(r"\s*(?:\.\.\.|…)\s*")
+# Nama opsi baris perintah (`--reset-com8`, `--mode=x`) bukan kutipan isi log (v3.18.1).
+OPSI = re.compile(r"--[A-Za-z][\w-]*(?:=\S+)?")
+PEMISAH_TABEL = re.compile(r"^\s*\|?\s*:?-{3,}")
 # Provenance (v3.18): path sementara di perintah, dan baris tabel yang mengakui kode keluar bukan 0.
 SEMENTARA = re.compile(r"[\\/](?:scratchpad|temp|tmp)[\\/]", re.I)
 AKUI_KELUAR = re.compile(r"(?:\bexit(?:[ _]?code)?|\bkode[ _]keluar)\D{0,3}(\d+)", re.I)
@@ -479,6 +490,13 @@ class Berkas:
         awal = r.rstrip("/") + "/"
         return sorted(self.root / n for n in self.pohon() if n.startswith(awal))
 
+    def diabaikan(self, p):
+        """True bila file di working tree diabaikan git (.gitignore). Pada commit (`rev`) semua file ter-track."""
+        if self.rev is not None:
+            return False
+        r = self.rel(p)
+        return r is not None and self.git("check-ignore", "-q", "--", r).returncode == 0
+
     def indeks(self):
         if self._indeks is None:
             self._indeks = {}
@@ -494,6 +512,10 @@ class Berkas:
             return p, None
         if "/" not in nama:
             cocok = self.indeks().get(nama.lower(), [])
+            if len(cocok) > 1:
+                # Salinan yang diabaikan git (log mentah di handoff/logs/raw/) bukan bukti bersama; bila hanya satu
+                # salinan yang tidak diabaikan, itulah yang dirujuk, sama dengan yang dibaca --at-report (v3.18.1).
+                cocok = [q for q in cocok if not self.diabaikan(q)] or cocok
             if len(cocok) == 1:
                 return cocok[0], None
             if len(cocok) > 1:
@@ -591,6 +613,30 @@ def cek_hitung(no, sel_bukti, teramati, berkas, hasil):
         if not obs or angka(obs.group(0)) != jumlah:
             hasil.masalah(no, f"Teramati \"{rapi(teramati)}\" tidak sama dengan hitungan: {jumlah} baris di {nama} cocok dengan \"{pola}\"")
     return bool(HITUNG.search(sel_bukti))
+
+
+def cek_klaim_hitung(no, teks, berkas, hasil):
+    """Klaim `hitung(lingkup, "pola")=N` di luar kolom Bukti tabel kriteria: N harus sama dengan jumlah baris yang cocok
+    (v3.18.1). Pola lapangan: lampiran task FAKTA berisi 83 klaim `=0` dan 9 di antaranya tidak 0, tetapi lolos karena
+    dulu hanya sel Bukti tabel kriteria yang dihitung ulang. Lingkup yang disingkat (`hitung(..., "GALAT")`) dilewati."""
+    for m in HITUNG.finditer(teks):
+        klaim = KLAIM_HITUNG.match(teks, m.end())
+        if not klaim or ELISI.search(m.group(1)):
+            continue
+        for nama, pola, jumlah in hitung_cocok(no, m.group(0), berkas, hasil):
+            if jumlah != int(klaim.group(1)):
+                hasil.masalah(no, f"klaim hitung({nama}, \"{pola}\")={klaim.group(1)}, padahal {jumlah} baris di {nama} cocok")
+
+
+def cek_lampiran(tabel, berkas, hasil):
+    """Tabel tanpa kolom Bukti dan Status, mis. lampiran task FAKTA: klaim `hitung(...)=N` di selnya dicek, kecuali di
+    kolom Harapan, yang berisi syarat, bukan hasil (v3.18.1)."""
+    h = [c.lower() for c in sel(tabel[0][1])]
+    harapan = {i for i, c in enumerate(h) if "harapan" in c or "expected" in c}
+    for no, baris in tabel[2:]:
+        for i, c in enumerate(sel(baris)):
+            if i not in harapan:
+                cek_klaim_hitung(no, c, berkas, hasil)
 
 
 def ambil_baris(no, nama, n, berkas, hasil):
@@ -802,11 +848,35 @@ def rujukan_prosa(teks):
 
 
 def bukan_kutipan(s):
-    """Span berbacktick yang bukan kutipan isi file: rujukan, nama file, hitung(), user:, atau perintah."""
+    """Span berbacktick yang bukan kutipan isi file: rujukan, nama file, hitung(), user:, perintah, atau nama opsi."""
     s = s.strip()
     return (not s or REF_PROSA.fullmatch(s) is not None or (REF_PROSA.search(s) is not None and re.search(FILE, s, re.I) is not None)
             or re.fullmatch(FILE, s, re.I) is not None or re.search(r"(?:hitung|count)\(|\buser\s*:", s, re.I) is not None
-            or PERINTAH.match(s) is not None)
+            or PERINTAH.match(s) is not None or OPSI.fullmatch(s) is not None)
+
+
+def kutipan_kolom(q, asli, n):
+    """True bila kutipan q berbentuk `<nama kolom> <isi sel>` untuk baris ke-n (mulai 1) di asli yang berupa baris tabel
+    Markdown; nama kolom diambil dari kepala tabel itu (v3.18.1, tanda palsu `Konfirmasi +3.750 s` dari tabel di log)."""
+    i = n - 1
+    if not 0 <= i < len(asli) or not asli[i].lstrip().startswith("|"):
+        return False
+    j = i
+    while j > 0 and asli[j - 1].lstrip().startswith("|"):
+        j -= 1
+    if j + 1 >= i or not PEMISAH_TABEL.match(asli[j + 1]):
+        return False
+    kepala, isi = sel(asli[j]), sel(asli[i])
+    if len(kepala) != len(isi):
+        return False
+    q = rapi(q)
+    for nama, nilai in zip(kepala, isi):
+        nama = rapi(nama).strip("`*")
+        if nama and q.lower().startswith(nama.lower()):
+            sisa = q[len(nama):].lstrip(" :=")
+            if sisa and sisa in rapi(nilai):
+                return True
+    return False
 
 
 def cek_prosa(no, t, berkas, hasil):
@@ -826,10 +896,12 @@ def cek_prosa(no, t, berkas, hasil):
                 sebelum = sebelum[:mr.start()]
                 mr = KUTIP_RANTAI.search(sebelum)
             kutipan = [q for q in kutipan if not bukan_kutipan(q)]
-        calon, files, catatan = [], [], []
+        calon, files, catatan, tak_dicek, rentang = [], [], [], [], []
         for nama, a, b in refs:
-            p, _ = berkas.cari(nama)
+            p, galat = berkas.cari(nama)
             if p is None:
+                if nama.lower().endswith(LOG_EXT) and galat not in tak_dicek:
+                    tak_dicek.append(galat)
                 continue
             isi = berkas.baris(p)[1]
             if a < 1 or a > len(isi):
@@ -837,13 +909,19 @@ def cek_prosa(no, t, berkas, hasil):
             potong = isi[a - 1:min(len(isi), b)] if a >= 1 else []
             calon += potong + ([" ".join(potong)] if b > a else [])
             files.append(p)
+            rentang.append((p, a, b))
         if not files:
+            # Dulu dilewati diam-diam; nama ambigu atau file yang tidak ada berarti kutipan itu tidak pernah dicek (v3.18.1).
+            if kutipan and tak_dicek:
+                daftar = ", ".join(f"`{rapi(q)[:60]}`" for q in kutipan)
+                hasil.peringatan(no, f"kutipan {daftar} tidak dicek: {'; '.join(tak_dicek)}")
             continue
         for q in kutipan:
             bagian = [rapi(x) for x in ELISI.split(q) if rapi(x)]
             if not bagian:
                 continue
-            if any(all(x in c for x in bagian) for c in calon):
+            if any(all(x in c for x in bagian) for c in calon) or (
+                    len(bagian) == 1 and any(kutipan_kolom(q, berkas.baris(p)[0], n) for p, a, b in rentang for n in range(a, b + 1))):
                 hasil.dicek += 1
                 continue
             ada = [f"{p.relative_to(berkas.root).as_posix()}:{i}" for p in files
@@ -897,8 +975,11 @@ def periksa(path_report, berkas, asal=None, wajib_asal=False):
             while j < len(baris) and baris[j].strip().startswith("|"):
                 j += 1
             tabel = [(k + 1, baris[k]) for k in range(i, j)]
-            if len(tabel) >= 3 and re.match(r"^\s*\|?\s*:?-{3,}", tabel[1][1]):
-                ada_tabel = cek_tabel(tabel, berkas, hasil, data, asal) or ada_tabel
+            if len(tabel) >= 3 and PEMISAH_TABEL.match(tabel[1][1]):
+                if cek_tabel(tabel, berkas, hasil, data, asal):
+                    ada_tabel = True
+                else:
+                    cek_lampiran(tabel, berkas, hasil)
             i = j
             continue
         s = t.strip()
@@ -911,6 +992,7 @@ def periksa(path_report, berkas, asal=None, wajib_asal=False):
             cek_angka(i + 1, s, hasil)
         if not s.startswith(("#", ">")):
             cek_prosa(i + 1, t, berkas, hasil)
+            cek_klaim_hitung(i + 1, t, berkas, hasil)
         i += 1
     blocked = BLOCKED.search(teks)
     # Log yang hanya tercantum di output git status (Periksa Diri) bukan bukti, jadi asalnya tidak dicek (v3.9.2).

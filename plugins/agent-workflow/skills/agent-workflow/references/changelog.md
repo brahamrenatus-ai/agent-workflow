@@ -354,6 +354,16 @@ Perubahan lain tanpa penanda baru: syarat `@bila_orca` kini mencari perintah `or
 | Q5 | README mencatat keputusan user atas sesi head baru otomatis | `handoff/README.md` | T3 butir **Orca** | Keputusan user |
 | Y15 | Alat sesi head baru terpasang di project | `handoff/tools/head_restart.py` | Salin `scripts/head_restart.py` | – |
 
+## v3.18.1 (2026-11-05): klaim `hitung` di seluruh report, dialog kepercayaan folder
+Berasal dari survei kelima. Di aplikasi budidaya, lampiran task FAKTA memuat 83 klaim `hitung(lingkup, "pola")=0`, dan 9 di antaranya tidak 0, tetapi `check_evidence.py` meloloskannya di kedua mode karena hanya kolom Bukti tabel kriteria yang dihitung ulang; head menemukannya dengan skrip sekali pakai. Diukur atas 219 report ketiga project sebelum ditulis: 96 klaim di luar kolom itu (8 report). Dengan `--at-report`, selisihnya 10, semuanya di report itu, setelah dua bentuk yang bukan klaim hasil dikecualikan: syarat di kolom Harapan dan lingkup yang disingkat `...`. Di IoT SCADA, satu kutipan prosa `Konfirmasi +3.750 s` ditandai palsu karena nama kolomnya ada di kepala tabel log, bukan di baris yang dirujuk. Di folder kerja, sembilan rujukan kutipan prosa di tiga report tidak pernah dicek: nama lognya ambigu dengan salinan mentah di `handoff/logs/raw/` yang diabaikan git, dan pemeriksa melewatinya diam-diam. Rujukan ke log yang tidak ada juga dilewati (2 di folder kerja, 12 dengan `--at-report`). Satu kutipan yang terlewat ternyata nama opsi (`--reset-com8`), bukan isi log. Di aplikasi budidaya, worker Claude di akun yang baru pertama membuka project macet di dialog kepercayaan folder tanpa terlihat di Orca, dan `tui-idle` terpenuhi sebelum header Claude Code tampil.
+
+Perubahan lain tanpa penanda baru: keterangan `@bila_orca` di bawah disamakan dengan `check_version.py` sejak v3.18 (perintah `orca orchestration` atau `orca terminal`, bukan kata Orca).
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| D15 | Worker di terminal sendiri: `tui-idle` bisa terpenuhi sebelum header tampil, dan dialog kepercayaan folder akun baru dijawab user | instruksi head | T1 butir **Worker Claude Code memakai akun sesi head** langkah 2 | – |
+| Y16 | `check_evidence.py` menghitung ulang klaim `hitung(...)=N` di prosa dan tabel lampiran, menerima kutipan `<nama kolom> <isi sel>` dari baris tabel di log, melewati nama opsi, mendahulukan salinan log yang tidak diabaikan git, dan memperingatkan kutipan prosa yang tidak bisa dicek | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py` | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -367,7 +377,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 - **Cara mencocokkan:** teks dicocokkan tanpa peduli huruf besar-kecil. `||` berarti cukup salah satu. Penanda teks (`head~`, `readme~`, `file:`, dst.) juga dianggap ada bila file sasarannya memuat tag `<!-- aw: ID -->` dengan ID penanda itu.
 - **`@bila_secret`:** penanda itu hanya berlaku bila project punya file secret lokal.
 - **`@bila_ui`:** penanda itu hanya berlaku bila project punya antarmuka pengguna: framework UI di `package.json` (React, Vue, Svelte, Angular, Next, Vite, Electron, React Native, …), Flutter, atau file khas UI (`*.html`, `*.vue`, `*.svelte`, `*.jsx`, `*.tsx`, `*.xaml`, `*.storyboard`, `*.qml`, `AndroidManifest.xml`) di luar `handoff/` dan folder hasil build.
-- **`@bila_orca`:** penanda itu hanya berlaku bila protokol mencatat bahwa head menjalankan executor lewat Orca, yaitu bila `handoff/README.md` atau instruksi head menyebut kata `Orca`. Project yang baru akan memakai Orca belum mendapat kandidat ini dari `check_version.py`; AUDIT menanyakannya di putaran tanya (SKILL.md §2), lalu memasang D4–D6.
+- **`@bila_orca`:** penanda itu hanya berlaku bila protokol mencatat bahwa head menjalankan executor lewat Orca, yaitu bila `handoff/README.md` atau instruksi head memuat perintah `orca orchestration` atau `orca terminal` (sejak v3.18; sebelumnya cukup kata `Orca`). Project yang baru akan memakai Orca belum mendapat kandidat ini dari `check_version.py`; AUDIT menanyakannya di putaran tanya (SKILL.md §2), lalu memasang D4–D6.
 
 ```penanda
 2.1  B1    ada~handoff/ROADMAP.md || ada~ROADMAP.md
@@ -494,4 +504,6 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.18 Q4    head~head_restart.py  @bila_orca
 3.18 Q5    readme~Sesi head baru otomatis  @bila_orca
 3.18 Y15   ada~handoff/tools/head_restart.py  @bila_orca
+3.18.1 D15 head~dialog kepercayaan folder  @bila_orca
+3.18.1 Y16 file:handoff/tools/check_evidence.py~def cek_klaim_hitung
 ```
