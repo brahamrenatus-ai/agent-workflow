@@ -366,7 +366,7 @@ Perintah di bagian ini sudah **dicek jalan** di mesin ini ({{tanggal}}). Perinta
 - Cek secret (bila `handoff/tools/check_secrets.py` ada): `python handoff/tools/check_secrets.py --staged` sebelum commit.
 - Simpan bukti: `python handoff/tools/record.py handoff/logs/TASK-NNN-<nama>.log "<perintah>"` (asal log dicatat di `handoff/logs/provenance.jsonl`). File yang ditulis perintah itu sendiri: `--result <file>` atau `--result "<pola glob>"`. Log task yang sudah DONE/BLOCKED tidak ditimpa tanpa `--overwrite`.
 - Cek bukti: `python handoff/tools/check_evidence.py handoff/reports/REPORT-NNN.md` sebelum DONE. Report lama: tambah `--at-report`, supaya kutipan dicocokkan dengan isi file saat report di-commit. <!-- aw: P1 N11 -->
-- Cek tampilan (project ber-UI): `{{CEK_TAMPILAN}}`, ukuran layar sasaran {{UKURAN_LAYAR}}. Alat `handoff/tools/screenshot.py` mengemulasikan ukuran itu, menyimpan tangkapan layar di `handoff/logs/`, dan mencetak elemen yang keluar layar (exit 1 bila ada). `--offline` memblokir layanan live. <!-- aw: I3 -->
+- Cek tampilan (project ber-UI): `{{CEK_TAMPILAN}}`, ukuran layar sasaran {{UKURAN_LAYAR}}. Alat `handoff/tools/screenshot.py` mengemulasikan ukuran itu, menyimpan tangkapan layar di `handoff/logs/`, dan mencetak elemen yang keluar layar (exit 1 bila ada). `--offline` memblokir layanan live, kecuali host halaman itu sendiri; host lain yang dibutuhkan halaman ditambah dengan `--allow-host`. <!-- aw: I3 -->
 
 ## Penomoran
 `NNN` berurutan. Report memakai nomor task-nya. Task ad-hoc = nomor terakhir + huruf.

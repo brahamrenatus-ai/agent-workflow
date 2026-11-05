@@ -2,12 +2,15 @@
 dipotong), tangkapan layar berukuran sesuai, dan ukuran halaman/elemen yang keluar layar bisa dinilai skrip.
 Dilewati bila Chrome/Chromium/Edge tidak ada di mesin ini.
 Pemakaian: python -X utf8 tests/test_screenshot.py <folder skill>"""
+import http.server
 import importlib.util
+import inspect
 import shutil
 import struct
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 SKILL = Path(sys.argv[1]).resolve()
@@ -61,6 +64,30 @@ if "--sizes" in SKRIP.read_text(encoding="utf-8"):  # v3.12: nama opsi berbahasa
                              encoding="utf-8").stdout
     cek("--sizes" in bantuan and "page" in bantuan and not any(o in bantuan for o in ("--ukuran", "--luring", "--tunggu", "UKURAN", "TUNGGU")),
         "--help hanya menampilkan nama opsi baru", bantuan)
+# v3.19.1: --offline tetap mengizinkan host halaman itu sendiri, dan --allow-host menambah host lain.
+IZIN = "--allow-host" in SKRIP.read_text(encoding="utf-8")
+if IZIN:
+    aturan = getattr(modul, "aturan_luring", None)
+    cek(aturan is not None and aturan() == "MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1",
+        "aturan_luring(): semua host diblokir kecuali localhost dan 127.0.0.1")
+    cek(aturan is not None and aturan(("192.168.4.1", "*.lan")).endswith(
+        "EXCLUDE 127.0.0.1 , EXCLUDE 192.168.4.1 , EXCLUDE *.lan"), "aturan_luring(kecuali): host tambahan ikut dikecualikan")
+    param = inspect.signature(modul.buka_browser).parameters.get("kecuali")
+    cek(param is not None and param.default == (), "buka_browser(..., kecuali=()) untuk alat project yang memanggilnya")
+    d_izin = Path(tempfile.mkdtemp(prefix="uji_izin_"))
+    try:
+        (d_izin / "a.html").write_text("<p>a</p>", encoding="utf-8")
+        for argumen, pesan, nama in (
+                (["--allow-host", "10.0.0.2"], "hanya berlaku bersama --offline", "--allow-host tanpa --offline: exit 2"),
+                (["--offline", "--allow-host", "10.0.0.2:80"], "tanpa port", "--allow-host dengan port: exit 2")):
+            r = subprocess.run([sys.executable, "-X", "utf8", str(SKRIP), str(d_izin / "a.html"), str(d_izin / "x"), *argumen],
+                               capture_output=True, text=True, encoding="utf-8")
+            cek(r.returncode == 2 and pesan in r.stderr, nama, r.stdout + r.stderr)
+    finally:
+        shutil.rmtree(d_izin, ignore_errors=True)
+    bantuan = subprocess.run([sys.executable, "-X", "utf8", str(SKRIP), "--help"], capture_output=True, text=True,
+                             encoding="utf-8").stdout
+    cek("--allow-host" in bantuan, "--help menampilkan --allow-host", bantuan)
 if not modul.cari_browser():
     print("LEWAT uji screenshot selebihnya: Chrome, Chromium, atau Edge tidak ada di mesin ini")
     print("\nHASIL:", "SEMUA OK" if ok else "ADA YANG GAGAL")
@@ -91,6 +118,70 @@ def ukuran_png(p):
     return struct.unpack(">II", b[16:24]) if b[:8] == b"\x89PNG\r\n\x1a\n" else None
 
 
+PNG_1PX = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+                        "1f15c4890000000d49444154789c6360000002000154a24f5f0000000049454e44ae426082")
+
+
+class ServerUji(http.server.ThreadingHTTPServer):
+    """Koneksi yang diputus browser saat ditutup (ConnectionResetError di Windows) bukan kegagalan uji."""
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], ConnectionError):
+            super().handle_error(request, client_address)
+
+
+def penyaji(catatan, nama, isi, jenis):
+    class Penyaji(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            catatan[nama].append(self.path)
+            badan = isi()
+            self.send_response(200)
+            self.send_header("Content-Type", jenis)
+            self.send_header("Content-Length", str(len(badan)))
+            self.end_headers()
+            self.wfile.write(badan)
+
+        def log_message(self, *a):
+            pass
+    return Penyaji
+
+
+def uji_host_perangkat(tmp):
+    """v3.19.1: 127.0.0.2 meniru Web UI perangkat, 127.0.0.3 meniru layanan lain di jaringan lokal yang dipanggil halaman.
+    Sebelumnya --offline memblokir halaman perangkat itu sendiri (net::ERR_NAME_NOT_RESOLVED, exit 2)."""
+    catatan = {"perangkat": [], "api": []}
+    try:
+        api = ServerUji(("127.0.0.3", 0), penyaji(catatan, "api", lambda: PNG_1PX, "image/png"))
+    except OSError as e:
+        print(f"LEWAT uji host perangkat: 127.0.0.3 tidak bisa dipakai di mesin ini ({e})")
+        return
+    html = (KEPALA + f'<body><p>perangkat</p><img src="http://127.0.0.3:{api.server_address[1]}/titik.png"></body></html>').encode()
+    try:
+        perangkat = ServerUji(("127.0.0.2", 0), penyaji(catatan, "perangkat", lambda: html,
+                                                                             "text/html; charset=utf-8"))
+    except OSError as e:
+        api.server_close()
+        print(f"LEWAT uji host perangkat: 127.0.0.2 tidak bisa dipakai di mesin ini ({e})")
+        return
+    for s in (api, perangkat):
+        threading.Thread(target=s.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.2:{perangkat.server_address[1]}/"
+        rc, out = jalan(url, tmp / "out/perangkat", "--sizes", "375x812", "--offline", "--wait", "300")
+        cek(rc == 0 and "/" in catatan["perangkat"] and not catatan["api"] and "127.0.0.2" in out,
+            "--offline: halaman di alamat perangkat termuat, host lain yang dipanggilnya tetap diblokir",
+            f"{out}\nperangkat={catatan['perangkat']} api={catatan['api']}")
+        catatan["api"].clear()
+        rc, out = jalan(url, tmp / "out/izin", "--sizes", "375x812", "--offline", "--allow-host", "127.0.0.3", "--wait", "300")
+        cek(rc == 0 and "/titik.png" in catatan["api"], "--offline --allow-host: host tambahan itu bisa dihubungi",
+            f"{out}\napi={catatan['api']}")
+    finally:
+        for s in (api, perangkat):
+            s.shutdown()
+            s.server_close()
+
+
 tmp = Path(tempfile.mkdtemp(prefix="uji_foto_"))
 try:
     for nama, isi in HALAMAN.items():
@@ -118,6 +209,10 @@ try:
         print("LEWAT uji rute hash: screenshot.py versi lama")
     rc, out = jalan(tmp / "jebakan.html", tmp / "out/luring", "--sizes", "375x812", "--offline", "--wait", "300")
     cek(rc == 0 and "layar 375 px" in out, "--offline: halaman lokal tetap termuat", out)
+    if IZIN:
+        uji_host_perangkat(tmp)
+    else:
+        print("LEWAT uji host perangkat: screenshot.py versi lama")
     rc, out = jalan(tmp / "tidak-ada.html", tmp / "out/x")
     cek(rc == 2 and "bukan URL dan bukan file" in out, "file yang tidak ada: exit 2", out)
     rc, out = jalan(tmp / "jebakan.html", tmp / "out/x", "--sizes", "375kali812")

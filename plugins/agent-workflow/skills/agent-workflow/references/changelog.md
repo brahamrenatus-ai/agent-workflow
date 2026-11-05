@@ -396,6 +396,17 @@ Perubahan lain tanpa penanda baru:
 | D17 | Proses yang dinyalakan worker ikut mati saat worker dilepas; yang harus tetap hidup dinyalakan sesi head | instruksi head | T1 butir **Sesudah triase** | – |
 | D18 | Task FAKTA yang berjalan bersamaan dengan worker penyunting mengutip dari HEAD | instruksi head | T1 butir **Satu task per dispatch** | – |
 
+## v3.19.1 (2026-11-05): `screenshot.py --offline` untuk halaman perangkat
+Berasal dari tambalan lokal di project IoT SCADA. Mode `--offline` memblokir semua host lewat `--host-resolver-rules`, termasuk alamat IP, sehingga Web UI perangkat (mis. `http://192.168.4.1`) ikut diblokir dan fotonya gagal dengan `net::ERR_NAME_NOT_RESOLVED`. Pengamat bench project itu memanggil `buka_browser(..., kecuali=)` dari salinan yang ditambal, dan tambalan itu harus dibawa manual setiap kali alatnya diganti versi skill.
+
+Sekarang `--offline` selalu mengizinkan host halaman yang difoto, `--allow-host HOST` (bisa berulang, tanpa port) menambah host lain yang dipanggil halaman, dan output mencetak host yang boleh dihubungi. `buka_browser(exe, profil, luring, kecuali=())` menerima argumen yang sama dengan tambalan itu, jadi alat project yang memanggilnya tetap jalan. Uji meniru perangkat di 127.0.0.2 dan layanan lain di 127.0.0.3; `screenshot.py` v3.19 gagal di kedua kasus.
+
+Perubahan lain tanpa penanda baru: kalimat `--offline` di butir **Cek tampilan** SKILL.md, baris **Cek tampilan** T3, dan README repo.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| I6 | `screenshot.py` versi ini: `--offline` memuat halaman di alamat perangkat, `--allow-host` menambah host | `handoff/tools/screenshot.py` | Salin ulang `scripts/screenshot.py`; tambalan lokal lain dibawa | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -547,4 +558,5 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.19 D16   head~sengaja gagal  @bila_orca
 3.19 D17   head~ikut mati saat worker dilepas  @bila_orca
 3.19 D18   head~diambil dari HEAD  @bila_orca
+3.19.1 I6  file:handoff/tools/screenshot.py~--allow-host  @bila_ui
 ```

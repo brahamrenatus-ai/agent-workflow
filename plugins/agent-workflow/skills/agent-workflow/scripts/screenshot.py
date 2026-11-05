@@ -4,6 +4,7 @@
 Dijalankan dari root project (skill agent-workflow menyalinnya ke handoff/tools/ untuk project ber-UI):
   python handoff/tools/screenshot.py <url atau file .html> handoff/logs/TASK-NNN-<layar>
   python handoff/tools/screenshot.py http://localhost:4173 handoff/logs/TASK-NNN-beranda --sizes 375x812 1366x768 --offline
+  python handoff/tools/screenshot.py http://192.168.4.1 handoff/logs/TASK-NNN-webui --offline   # Web UI perangkat
 
 Untuk setiap ukuran, halaman dibuka di Chrome, Chromium, atau Edge headless dengan emulasi perangkat lewat
 DevTools Protocol. Lebar di bawah 768 px diemulasikan sebagai HP, sehingga `<meta name="viewport">` dihormati.
@@ -20,7 +21,10 @@ HP muat, atau sebaliknya.
 
 Opsi:
   --sizes WxH ...   ukuran layar sasaran (bawaan: 375x812 1366x768)
-  --offline         blokir semua host selain localhost dan 127.0.0.1 (aman untuk halaman yang memanggil layanan live)
+  --offline         blokir semua host selain localhost, 127.0.0.1, dan host halaman itu sendiri (aman untuk halaman yang
+                    memanggil layanan live; halaman di alamat perangkat, mis. http://192.168.4.1, tetap termuat)
+  --allow-host HOST bersama --offline: host lain yang tetap boleh dihubungi, mis. API uji di jaringan lokal (bisa berulang;
+                    nama host atau IP tanpa port, boleh berpola seperti *.lan)
   --wait MS         jeda sesudah halaman termuat, untuk render JavaScript (bawaan 1500)
 Nama opsi sebelum v3.12 (--ukuran, --luring, --tunggu) tetap diterima.
 Browser dicari di variabel CHROME, lalu lokasi umum Chrome, Chromium, dan Edge.
@@ -31,6 +35,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import shutil
 import socket
 import struct
@@ -38,8 +43,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
+
+HOST_LOKAL = ("localhost", "127.0.0.1")
+POLA_HOST = re.compile(r"[A-Za-z0-9*][A-Za-z0-9.*_-]*")  # nama host, IPv4, atau pola *.lan; tanpa port
 
 LOKASI_BROWSER = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -218,11 +227,19 @@ def baca_port(berkas):
     return baris[0].strip() if len(baris) >= 2 and baris[0].strip().isdigit() else None
 
 
-def buka_browser(exe, profil, luring):
+def aturan_luring(kecuali=()):
+    """Aturan --host-resolver-rules mode --offline: semua host diblokir (juga alamat IP), kecuali localhost, 127.0.0.1,
+    dan host di `kecuali`."""
+    return "MAP * ~NOTFOUND" + "".join(f" , EXCLUDE {h}" for h in (*HOST_LOKAL, *kecuali))
+
+
+def buka_browser(exe, profil, luring, kecuali=()):
+    """kecuali: host tambahan yang tetap di-resolve saat luring, mis. alamat perangkat yang halamannya difoto.
+    Alat project lain (mis. pengamat bench) boleh memanggil fungsi ini dengan argumen yang sama."""
     args = [exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--hide-scrollbars",
             "--disable-extensions", f"--user-data-dir={profil}", "--remote-debugging-port=0", "about:blank"]
     if luring:
-        args.insert(1, "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1")
+        args.insert(1, f"--host-resolver-rules={aturan_luring(kecuali)}")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         args.insert(1, "--no-sandbox")  # Chrome menolak berjalan sebagai root (mis. di container) tanpa ini
     proses = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -283,7 +300,10 @@ def main():
     ap.add_argument("prefix", help="awalan file tangkapan layar, mis. handoff/logs/TASK-012-beranda")
     ap.add_argument("--sizes", dest="ukuran", nargs="+", default=["375x812", "1366x768"], metavar="WxH",
                     help="ukuran layar WxH (bawaan: 375x812 1366x768)")
-    ap.add_argument("--offline", dest="luring", action="store_true", help="blokir semua host selain localhost dan 127.0.0.1")
+    ap.add_argument("--offline", dest="luring", action="store_true",
+                    help="blokir semua host selain localhost, 127.0.0.1, dan host halaman itu sendiri")
+    ap.add_argument("--allow-host", dest="izinkan", action="append", default=[], metavar="HOST",
+                    help="bersama --offline: host lain yang tetap boleh dihubungi (bisa berulang; tanpa port)")
     ap.add_argument("--wait", dest="tunggu", type=int, default=1500, metavar="MS", help="jeda sesudah halaman termuat, dalam ms (bawaan 1500)")
     # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.
     ap.add_argument("--ukuran", dest="ukuran", nargs="+", help=argparse.SUPPRESS)
@@ -302,6 +322,21 @@ def main():
     else:
         print(f"[screenshot] {a.halaman} bukan URL dan bukan file yang ada", file=sys.stderr)
         return 2
+    if a.izinkan and not a.luring:
+        print("[screenshot] --allow-host hanya berlaku bersama --offline", file=sys.stderr)
+        return 2
+    salah = [h for h in a.izinkan if not POLA_HOST.fullmatch(h)]
+    if salah:
+        print(f"[screenshot] --allow-host butuh nama host atau IP tanpa port, mis. 192.168.4.1: {' '.join(salah)}", file=sys.stderr)
+        return 2
+    kecuali = []
+    if a.luring:
+        # Host halaman itu sendiri selalu diizinkan: tanpa itu halaman di alamat perangkat ikut diblokir.
+        host = urllib.parse.urlsplit(url).hostname or ""
+        for h in ([host] if POLA_HOST.fullmatch(host) else []) + [h.lower() for h in a.izinkan]:
+            if h not in HOST_LOKAL and h not in kecuali:
+                kecuali.append(h)
+        print("[screenshot] --offline: host yang boleh dihubungi: " + ", ".join((*HOST_LOKAL, *kecuali)))
     exe = cari_browser()
     if not exe:
         print("[screenshot] Chrome, Chromium, atau Edge tidak ditemukan; isi variabel CHROME dengan path browser", file=sys.stderr)
@@ -310,7 +345,7 @@ def main():
     proses, ws = None, None
     ada_masalah = False
     try:
-        proses, alamat = buka_browser(exe, profil, a.luring)
+        proses, alamat = buka_browser(exe, profil, a.luring, kecuali)
         ws = WebSocket(alamat)
         cdp = DevTools(ws)
         cdp("Page.enable")
