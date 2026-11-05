@@ -92,6 +92,15 @@ This runs a structure check (frontmatter, version consistency, every changelog m
 
 When adding a rule that ends up in project files: add a row to the version's table in `references/changelog.md`, a marker in the `penanda` block, the rule text in every template variant that produces the target file, and the `<!-- aw: ID -->` tag on that line. Bump the version in `SKILL.md`, the changelog, and `plugins/agent-workflow/.claude-plugin/plugin.json` together.
 
+The tests above check the scripts and the rule text, not how a model behaves with the skill loaded. `plugins/agent-workflow/evals/` holds a small [`claude plugin eval`](https://code.claude.com/docs/en/plugin-evals) suite for that: the skill must fire on a natural planner/executor complaint, stay out of an unrelated coding request, and, in an audit, run `check_version.py` and report before changing anything. Run it before a release, not in CI, because every run is a real model call on your account:
+
+```
+claude plugin eval plugins/agent-workflow --tag trigger --trust-plugin
+claude plugin eval plugins/agent-workflow --tag shell --scaffold --allow-tools Bash Edit Write --trust-plugin
+```
+
+The `shell` case needs Bash, which Claude Code only grants where it has a sandbox backend (macOS, Linux, WSL); on native Windows the run is refused before any model call.
+
 ## Bahasa Indonesia
 
 Skill ini memasang, mengaudit, dan meng-upgrade alur kerja dua agen, yaitu head (perencana) dan executor (pelaksana), untuk project apa pun. Protokolnya disetel ke kapasitas model executor. Isi skill berbahasa Indonesia; file yang dibuat untuk project mengikuti bahasa user. Pasang lewat `/plugin marketplace add brahamrenatus-ai/agent-workflow` lalu `/plugin install agent-workflow@agent-workflow`, atau salin `plugins/agent-workflow/skills/agent-workflow/` ke `~/.claude/skills/agent-workflow/`. Mulai dari `SKILL.md`; riwayat versi ada di `references/changelog.md`.

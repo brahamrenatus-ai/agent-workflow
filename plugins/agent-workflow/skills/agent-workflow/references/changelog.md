@@ -364,6 +364,38 @@ Perubahan lain tanpa penanda baru: keterangan `@bila_orca` di bawah disamakan de
 | D15 | Worker di terminal sendiri: `tui-idle` bisa terpenuhi sebelum header tampil, dan dialog kepercayaan folder akun baru dijawab user | instruksi head | T1 butir **Worker Claude Code memakai akun sesi head** langkah 2 | – |
 | Y16 | `check_evidence.py` menghitung ulang klaim `hitung(...)=N` di prosa dan tabel lampiran, menerima kutipan `<nama kolom> <isi sel>` dari baris tabel di log, melewati nama opsi, mendahulukan salinan log yang tidak diabaikan git, dan memperingatkan kutipan prosa yang tidak bisa dicek | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py` | – |
 
+## v3.19 (2026-11-05): review dua tahap, pencocok berkas, alat ukur yang tidak lolos kosong, kerja paralel
+Berasal dari 13 entri `handoff/SKILL-FEEDBACK.md` aplikasi budidaya (2–4 Nov) dan survei kelima. Pola-pola yang ditemukan:
+- **Test diakali.** Executor mengakali test statis dengan pemanggilan dinamis alih-alih menulis BLOCKED. Kodenya lolos semua test dan `check_evidence.py`, dan baru tertangkap karena head membaca diff utuh. Review dua tahap (kepatuhan pada task, lalu mutu kode) diambil dari kerangka skill superpowers (`subagent-driven-development`).
+- **Pencocok kurang luas.** Tiga putaran tanya-jawab worker berasal dari pencocok yang hanya mencari bentuk data. Penyebabnya: test yang membaca berkas route sebagai teks, berkas yang dilarang menurut namanya padahal isinya menguji hal lain, dan mode audit yang memakai kelas CSS yang dibuang.
+- **Bukti dan alat ukur:**
+  - satu perintah regresi tanpa path keluaran menimpa foto bukti task lama;
+  - butir audit yang menemukan 0 elemen tercatat lolos;
+  - mode audit yang menulis ke DB uji masuk kriteria regresi;
+  - urutan alat SMOKE yang melanggar prasyarat data memberi dua GAGAL palsu.
+- **Perintah dan proses worker:** perintah di task gagal di shell worker karena hanya dicoba di Bash agen, dan app uji yang dinyalakan worker mati saat worker dilepas.
+- **Kerja paralel:**
+  - commit head membawa lima berkas yang di-stage sesi rancangan, karena indeks git dipakai bersama;
+  - test acceptance yang sengaja gagal di-commit selagi worker menjalankan seluruh suite;
+  - Harapan `git status` menjadi basi;
+  - kutipan task FAKTA bergeser satu baris di commit report, karena worker lain sedang menyunting berkas yang dikutip.
+
+Perubahan lain tanpa penanda baru:
+- T10 menerima entri berbentuk butir dengan `Status:` di ujungnya, bentuk yang dipakai head saat baris tabel terlalu panjang.
+- Repo skill punya suite uji perilaku `claude plugin eval` di `plugins/agent-workflow/evals/`: prompt nyata atas project contoh, dinilai grader dan dibandingkan dengan Claude tanpa skill. Suite ini dijalankan sebelum rilis, bukan di CI, karena memakai kuota model.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| M7 | Review dua tahap saat triase SEDANG dan RENDAH: kepatuhan pada task (wilayah, Sketsa, test tidak diakali), lalu mutu kode | instruksi head | T1 langkah 2 **Kedalaman verifikasi** | – |
+| K6 | Pencocok juga untuk berkas: test dan alat yang membaca berkas yang diubah atau dilarang sebagai teks; berkas terlarang diperiksa per butir | instruksi head | T1 langkah 4, butir pencocok persis | – |
+| K7 | Perintah regresi di task memberi path keluaran berlabel task | instruksi head | T1 langkah 4 **Alat ukur dan perintah regresi** | – |
+| K8 | Alat ukur menulis GALAT bila yang dicari tidak ada; mode yang menulis ditandai; alat SMOKE diurutkan menurut prasyarat data | instruksi head | T1 langkah 4 **Alat ukur dan perintah regresi** | – |
+| J4 | Perintah baru dicek di shell yang dipakai worker | instruksi head | T1 langkah 5 **Perintah baru** | – |
+| G3 | Selama ada sesi lain di folder yang sama, head commit dengan daftar path | instruksi head | T1 langkah 5 **Isi commit** | – |
+| D16 | Test acceptance yang sengaja gagal tidak di-commit selagi worker menjalankan seluruh suite; Harapan `git status` ditulis sesudah keputusan itu | instruksi head | T1 butir **Kerja paralel head dan worker** | – |
+| D17 | Proses yang dinyalakan worker ikut mati saat worker dilepas; yang harus tetap hidup dinyalakan sesi head | instruksi head | T1 butir **Sesudah triase** | – |
+| D18 | Task FAKTA yang berjalan bersamaan dengan worker penyunting mengutip dari HEAD | instruksi head | T1 butir **Satu task per dispatch** | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
 - **Jenis penanda:**
@@ -506,4 +538,13 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.18 Y15   ada~handoff/tools/head_restart.py  @bila_orca
 3.18.1 D15 head~dialog kepercayaan folder  @bila_orca
 3.18.1 Y16 file:handoff/tools/check_evidence.py~def cek_klaim_hitung
+3.19 M7    head~Review dua tahap
+3.19 K6    head~membacanya sebagai teks
+3.19 K7    head~berlabel task
+3.19 K8    head~0 temuan bukan lolos
+3.19 J4    head~shell yang dipakai worker
+3.19 G3    head~indeks git dipakai bersama
+3.19 D16   head~sengaja gagal  @bila_orca
+3.19 D17   head~ikut mati saat worker dilepas  @bila_orca
+3.19 D18   head~diambil dari HEAD  @bila_orca
 ```
