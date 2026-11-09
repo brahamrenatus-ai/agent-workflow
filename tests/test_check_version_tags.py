@@ -1,5 +1,6 @@
 """Uji check_version.py v3.10: penanda dikenali lewat tag <!-- aw: ID --> walau teks protokol bukan bahasa Indonesia,
-syarat @bila_ui, (sejak v3.11) syarat @bila_orca, dan (sejak v3.12) penanda nama lama `tiada~`. Fixture dibuat dari template skill: setiap baris dibuang teksnya, hanya tag yang disisakan,
+syarat @bila_ui, (sejak v3.11) syarat @bila_orca, (sejak v3.12) penanda nama lama `tiada~`, dan (sejak v3.21) syarat
+@bila_side_session dengan penanda `side~`. Fixture dibuat dari template skill: setiap baris dibuang teksnya, hanya tag yang disisakan,
 lalu diberi teks pengisi berbahasa Inggris. Dengan begitu satu-satunya jalan penanda teks terpenuhi adalah tag.
 Pemakaian: python -X utf8 tests/test_check_version_tags.py <folder skill>"""
 import re
@@ -28,6 +29,8 @@ if "def punya_tag" not in CEK.read_text(encoding="utf-8"):
     sys.exit(0)
 
 tp = (SKILL / "references" / "templates.md").read_text(encoding="utf-8")
+_ss = SKILL / "references" / "side-session.md"  # template sesi samping T11–T12, sejak v3.21
+tp += "\n" + (_ss.read_text(encoding="utf-8") if _ss.is_file() else "")
 TAG = re.compile(r"<!--\s*aw:[^>]*?-->")
 
 
@@ -174,6 +177,34 @@ try:
         rc, out = jalan(h)
         if "TANDA_ORCA" in CEK.read_text(encoding="utf-8"):  # sejak v3.18
             cek("| Orca: tidak ada" in out, "kata Orca tanpa perintahnya tidak memenuhi syarat @bila_orca (kandidat palsu v3.16)", out)
+    if "bila_side_session" in CEK.read_text(encoding="utf-8"):  # sesi samping sejak v3.21
+        rc, out = jalan(a)
+        cek("| sesi samping: tidak ada" in out, "project tanpa file serah-terima: syarat @bila_side_session tidak terpenuhi", out)
+        s = tmp / "samping"
+        buat(s)
+        (s / ".claude/skills/demo-discuss").mkdir(parents=True)
+        (s / ".claude/skills/demo-discuss/SKILL.md").write_text(
+            hanya_tag("T11") + "Hand decisions to the head in handoff/discussion-handoff.md.\n", encoding="utf-8")
+        (s / "handoff/discussion-handoff.md").write_text(hanya_tag("T12"), encoding="utf-8")
+        p = s / ".claude/skills/demo-head/SKILL.md"
+        # Instruksi head juga menyebut file serah-terima dan teks aturan S9/S10, tetapi bukan instruksi sesi samping.
+        p.write_text(p.read_text(encoding="utf-8") + "Check handoff/discussion-handoff.md; SKILL-FEEDBACK; hanya dengan bukti baru.\n",
+                     encoding="utf-8")
+        rc, out = jalan(s)
+        cek(rc == 0 and "| sesi samping: ada" in out and f"Versi efektif: v{versi}" in out,
+            "sesi samping dengan aturan bertag: syarat terpenuhi, S8–S10 dikenali lewat tag", out)
+        p = s / ".claude/skills/demo-discuss/SKILL.md"
+        p.write_text(re.sub(r"\b(S9|S10)\b", "XX", p.read_text(encoding="utf-8")), encoding="utf-8")
+        rc, out = jalan(s)
+        hilang = set(re.findall(r"^  - ([A-Z0-9-]+) \(", out, re.M))
+        cek(rc == 1 and hilang == {"S9", "S10"},
+            "skill sesi samping tanpa aturannya: tepat S9 dan S10 jadi kandidat (instruksi head tidak dihitung sebagai sesi samping)", out)
+        u = tmp / "samping_task"
+        buat(u)
+        (u / "handoff/tasks").mkdir(parents=True, exist_ok=True)
+        (u / "handoff/tasks/TASK-007-design-handoff.md").write_text("- Jenis: FIX\n", encoding="utf-8")
+        rc, out = jalan(u)
+        cek(rc == 0 and "| sesi samping: tidak ada" in out, "task berakhiran -handoff di handoff/tasks/ bukan file serah-terima", out)
     if "tiada~" in CEK.read_text(encoding="utf-8"):  # penanda nama lama ada sejak v3.12
         n = tmp / "nama_lama"
         buat(n)

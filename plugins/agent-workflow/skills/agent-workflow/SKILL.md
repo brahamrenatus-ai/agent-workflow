@@ -5,7 +5,7 @@ description: Siapkan atau audit alur kerja dua-agen (head/perencana + executor/p
 
 # Agent Workflow — Head + Executor untuk Project Apa Pun
 
-**Versi skill: 3.20.2.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
+**Versi skill: 3.21.** Riwayat perubahan dan penanda tiap versi ada di `references/changelog.md`.
 
 Skill ini memasang atau memperbaiki alur kerja dua peran yang berkomunikasi lewat file di repo:
 - **Head** (perencana) menjaga arah, menganalisis hasil, memutuskan, mendesain, menulis task, dan memverifikasi.
@@ -62,6 +62,7 @@ Jelaskan mode yang dipilih beserta alasannya. Dua agen menambah latensi, karena 
     - Contoh: OK ditulis dengan kutipan log yang tidak ada di file log tersimpan, dan nilai harapan yang tidak terpenuhi tetap ditulis OK. Head meloloskannya dua kali. Kegagalan yang sama terulang walau aturannya sudah tertulis: kutipan yang tidak disalin dari file mana pun, baris log yang ditulis tangan, dan pengamatan user yang dikarang dengan menyalin teks kriteria. Kutipan karangan juga muncul di bagian Anomali, yang belum dicek alat; sejak v3.15 kutipan di prosa juga dicocokkan. `npm test` yang dijalankan 8 kali dengan 7 run gagal lalu tertimpa, dan alat uji yang mencetak `lulus=20/20` tetapi keluar 1, lolos karena hanya tercatat di `provenance.jsonl`, yang sejak v3.18 ikut dicek.
     - Cocokkan setiap OK dengan nilai harapan dan setiap kutipan dengan file log. Aturan saja tidak cukup: executor menyimpan output lewat `record.py` (log yang diedit tangan ketahuan dari hash-nya), menjalankan `check_evidence.py` sebelum DONE, dan menyusun report dari file tersimpan, satu sesi per task. Head menjalankan alat yang sama saat triase.
     - Urutan kekuatan bukti: yang bisa dijalankan ulang, lalu kutipan dari file tersimpan, lalu klaim.
+    - Keputusan yang diserahkan sesi samping (diskusi, rancangan) punya risiko yang sama: `file:baris` yang sudah bergeser, angka hasil hitungan sendiri, dan dugaan yang ditulis sebagai fakta masuk register bila head mencatatnya apa adanya. Head mengeceknya seperti report sebelum mencatat (`references/side-session.md`).
 16. **File protokol bukan tempat secret.**
     - Contoh: nilai kunci radio tertulis di ROADMAP.
     - Rujuk secret dengan nama atau lokasinya, bukan nilainya, dan grep sebelum commit.
@@ -74,7 +75,7 @@ Jelaskan mode yang dipilih beserta alasannya. Dua agen menambah latensi, karena 
 18. **Praktik umum belum tentu yang terbaik untuk project ini.**
     - Contoh: resep penegakan menulis "aturan ask/deny berlaku langsung" tanpa sumber, padahal aturan di file settings yang baru dibuat belum aktif sampai sesi berikutnya.
     - Saran umum seperti Git LFS, menulis ulang riwayat git, atau memindah ratusan file demi rapi bisa lebih mahal daripada masalahnya, terutama untuk project solo.
-    - Setiap rekomendasi lolos uji di §Kualitas Rekomendasi, dan selalu dibandingkan dengan opsi "biarkan".
+    - Setiap rekomendasi lolos uji di §Kualitas Rekomendasi, dan selalu dibandingkan dengan opsi "biarkan". Pilihan user pun bisa kalah dari opsi lain yang buktinya lebih kuat, jadi keputusan user juga diuji sebelum dijalankan.
 19. **Kapasitas melekat pada model, dan model sering tidak tahu namanya sendiri.**
     - Contoh: di Antigravity user berganti model per task (Opus, Gemini Flash). Report yang menjadi dasar penurunan kapasitas Gemini Flash hanya menulis pelaksana "<Project> Executor (Antigravity)", dan sebagian besar report lain juga tidak mencatat model.
     - Nilai kapasitas per model. Nama model datang dari prompt pembuka user, bukan dari tebakan executor.
@@ -163,6 +164,7 @@ handoff/
 - **Perintah dicek jalan.** Setiap perintah yang ditulis ke protokol (build, test, alat di `handoff/tools/`, langkah penutup seperti `graphify update`) dijalankan sekali di mesin ini, dan yang ditulis adalah bentuk yang jalan. Perintah di file aturan agen buatan tool lain (mis. `.agents/rules/graphify.md`) ikut dicek; bila gagal, bentuk yang jalan ditambahkan sebagai catatan di file itu. Perintah yang tidak boleh dijalankan agen (flash, deploy, migrasi) ditandai `belum dicek`.
 - **Cek tampilan.** Project ber-UI: salin `scripts/screenshot.py` ke `handoff/tools/`, tulis perintahnya beserta ukuran layar sasaran di README §Lingkungan (T3, baris **Cek tampilan**), lalu jalankan sekali dan lihat hasilnya. Halaman yang butuh server (mis. `vite preview`) atau perangkat ditulis dengan langkah menyalakannya; layanan live diblokir dengan `--offline`, yang tetap mengizinkan host halaman itu sendiri (mis. Web UI perangkat) dan host dari `--allow-host`. Jangan memotret lebar HP dengan `chrome --headless --window-size` biasa: Chrome desktop menata halaman minimal ±500 px lalu memotong fotonya. Tanpa Chrome, Chromium, atau Edge, jadikan Tugas User: cek di perangkat nyata (`user:`).
 - **Executor lewat Orca.** Bila head menjalankan executor lewat Orca, ikuti `references/orca.md`. Profil Executor mencatat peluncuran Orca per model, setelan izin agen dipilih bersama user (untuk project yang punya operasi berisiko, `Full access` hanya bila user menerima risikonya, dan task yang menyentuh operasi itu tidak lewat Orca), satu dispatch baca-saja dijalankan sebelum task pertama, dan head menunggu tanpa bangun berkala atau bekerja paralel di wilayah file lain. Salin `scripts/orca_wait.py` ke `handoff/tools/`; head menunggu dengan alat itu, sehingga heartbeat worker tidak membangunkannya. Salin juga `scripts/head_restart.py`, dan tanyakan apakah head boleh memulai sesi baru sendiri saat konteksnya besar; jawabannya dicatat di README (bawaan `tidak`), karena sesi baru melanjutkan ROADMAP §1 tanpa menunggu user. Tanpa Orca, bagian **Executor lewat Orca** (T1) dan **Dijalankan lewat Orca** (T2a/T2b) dihapus.
+- **Sesi samping.** Bila user ingin sesi terpisah dari head untuk diskusi, tanya-jawab, atau rancangan, ikuti `references/side-session.md`: instruksi sesi samping (T11), file serah-terima `handoff/<peran>-handoff.md` (T12), dan butir **Serah-terima sesi samping** di instruksi head, yang mengecek setiap keputusan seperti report sebelum dicatat. Tanpa sesi samping, butir itu dihapus.
 
 **Lokasi instruksi per tool**
 
@@ -284,7 +286,7 @@ Berlaku untuk semua yang disarankan skill ini: rencana AUDIT, item ROADMAP, peta
 4. **Aman.** Bisa dibalik, atau risikonya dan cara mundurnya disebut. Yang berisiko menjadi WAIT-USER.
 5. **Bisa dikerjakan.** Ada langkah konkret dan cara verifikasinya.
 
-Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rekomendasi utama. Sedikit rekomendasi yang kuat lebih baik daripada daftar panjang. Rekomendasi yang gagal salah satu uji dibuang, atau diturunkan menjadi catatan atau pertanyaan.
+Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rekomendasi utama. Sedikit rekomendasi yang kuat lebih baik daripada daftar panjang. Rekomendasi yang gagal salah satu uji dibuang, atau diturunkan menjadi catatan atau pertanyaan. Keputusan user diuji dengan cara yang sama: bila pilihan user gagal salah satu uji, atau ada opsi yang lebih baik menurut bukti, sampaikan sekali beserta buktinya sebelum menjalankannya. Keputusan tetap milik user dan dicatat beserta opsi yang disarankan; angkat lagi hanya dengan bukti baru.
 
 ## Kapasitas Executor
 
@@ -315,7 +317,7 @@ Urutkan rekomendasi dari dampak terbesar dibanding biayanya, dan tandai satu rek
 - **Yang tetap dijaga:** test acceptance tidak diubah executor, review head mencakup file baru (`git status --porcelain`), dan brief menolak task di atas kapasitas tanpa jalur ad-hoc.
 
 ## Template, Struktur & Penegakan
-- **Template** T1–T10, placeholder, dan penyesuaian per jenis project ada di `references/templates.md`. Baca file itu sebelum BOOTSTRAP/LITE, dan saat AUDIT bila butuh struktur sasaran.
+- **Template** T1–T10, placeholder, dan penyesuaian per jenis project ada di `references/templates.md`. Baca file itu sebelum BOOTSTRAP/LITE, dan saat AUDIT bila butuh struktur sasaran. Template sesi samping (T11–T12) ada di `references/side-session.md`, yang dibaca hanya bila project memakainya.
 - **Standar struktur** per jenis project, survei, aturan log bukti, dan cara memindah file ada di `references/structure.md`. Baca file itu saat BOOTSTRAP, AUDIT, dan mode STRUCTURE.
 - **Alat cek secret** generik ada di `scripts/check_secrets.py`. Cara memasangnya ada di §3.
 - **Changelog dan cek versi** (`references/changelog.md` + `scripts/check_version.py`) dipakai jalur upgrade di §4.

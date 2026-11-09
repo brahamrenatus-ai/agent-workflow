@@ -20,7 +20,9 @@ Penanda yang file sasarannya tidak ada (mis. instruksi executor di project LITE)
 Penanda bersyarat juga "n/a" bila syaratnya tidak terpenuhi: `@bila_secret` (project punya file secret lokal),
 `@bila_ui` (project punya antarmuka pengguna: web, mobile, atau desktop), dan `@bila_orca` (head menjalankan executor
 lewat Orca: README handoff atau instruksi head memuat perintah `orca orchestration` atau `orca terminal`). Kata Orca
-saja tidak memenuhi syarat ini.
+saja tidak memenuhi syarat ini. Sejak v3.21 juga `@bila_side_session` (project punya sesi samping: file `*-handoff.md`
+di handoff/, di luar tasks/, reports/, logs/, dan tools/), dengan penanda `side~teks` untuk instruksi sesi samping, yaitu
+skill atau workflow yang menyebut file itu, selain instruksi head, executor, dan dev.
 Path project boleh folder mana pun di dalam repo-nya; yang diperiksa root repo itu. Tanpa path, folder kerja dipakai.
 Exit code: 0 = semua penanda yang berlaku ada, 1 = ada yang hilang, 2 = argumen salah atau path tidak ada.
 """
@@ -41,6 +43,7 @@ PERAN = {
     "readme": ["handoff/README.md"],
     "roadmap": ["handoff/ROADMAP.md"],
     "notes": ["handoff/NOTES.md"],
+    "side": ["*/skills/*/SKILL.md", "*/workflows/*.md"],  # disaring file_peran: hanya yang menyebut file serah-terima
 }
 NAMA_SECRET = ["secrets.h", "secrets.hpp", "secret*.h", ".env", ".env.*", "*.env", "secrets.json", "secrets.yaml",
                "secrets.yml", "secrets.toml", "credentials.json"]
@@ -53,6 +56,9 @@ UI_FILE = ["*.html", "*.vue", "*.svelte", "*.jsx", "*.tsx", "*.xaml", "*.storybo
 TAG = re.compile(r"<!--\s*aw:([^>]*?)-->", re.I)
 # Tanda head memakai Orca (syarat @bila_orca, v3.18): perintahnya, yang sama dalam bahasa protokol apa pun.
 TANDA_ORCA = re.compile(r"\borca\s+(?:orchestration|terminal)\b", re.I)
+# File serah-terima sesi samping (v3.21): handoff/<peran>-handoff.md, juga di subfolder handoff/.
+TANDA_SAMPING = re.compile(r"handoff/(?:[\w.-]+/)*[\w.-]+-handoff\.md", re.I)
+BUKAN_SAMPING = {"tasks", "reports", "logs", "tools"}
 # Folder yang dipindai tiap tool untuk menemukan instruksi peran (SKILL.md §3, Lokasi instruksi per tool).
 TOOL_PERAN = {
     "Claude Code": [".claude/skills/*{peran}*/SKILL.md"],
@@ -94,7 +100,13 @@ def file_peran(root, peran):
             hasil += [Path(p) for p in glob.glob(str(root / pola))]
         elif (root / pola).is_file():
             hasil.append(root / pola)
-    return sorted({p for p in hasil if p.is_file()})
+    hasil = sorted({p for p in hasil if p.is_file()})
+    if peran == "side":
+        # Instruksi sesi samping: skill lain yang menyebut file serah-terima. Instruksi head juga menyebutnya (butir
+        # Serah-terima sesi samping), jadi file head, executor, dan dev dikeluarkan.
+        lain = {p.resolve() for q in ("head", "executor", "dev") for p in file_peran(root, q)}
+        hasil = [p for p in hasil if p.resolve() not in lain and TANDA_SAMPING.search(baca(p))]
+    return hasil
 
 
 def baca(p):
@@ -142,6 +154,20 @@ def ada_orca(root):
     Orca bisa menyebutnya (mis. kolom Peluncuran Orca yang kosong), lalu aturan Orca menjadi kandidat palsu. Orca sendiri
     tidak dipanggil, karena di Linux `orca` bisa berarti pembaca layar."""
     return any(TANDA_ORCA.search(f.read_text(encoding="utf-8", errors="replace")) for f in file_peran(root, "readme") + file_peran(root, "head"))
+
+
+def ada_samping(root):
+    """True bila project punya sesi samping (syarat @bila_side_session, v3.21): file `*-handoff.md` di handoff/, di luar
+    tasks/, reports/, logs/, dan tools/ (slug task juga bisa berakhiran -handoff)."""
+    h = root / "handoff"
+    if not h.is_dir():
+        return False
+    for dp, dns, fns in os.walk(h):
+        if Path(dp) == h:
+            dns[:] = [d for d in dns if d not in BUKAN_SAMPING]
+        if any(f.lower().endswith("-handoff.md") for f in fns):
+            return True
+    return False
 
 
 def cocok(teks, isi):
@@ -229,7 +255,8 @@ def main():
         return 2
     root = root_repo(args[0] if args else None)
     penanda = muat_changelog()
-    kondisi = {"bila_secret": ada_file_secret(root), "bila_ui": ada_ui(root), "bila_orca": ada_orca(root)}
+    kondisi = {"bila_secret": ada_file_secret(root), "bila_ui": ada_ui(root), "bila_orca": ada_orca(root),
+               "bila_side_session": ada_samping(root)}
     tertulis = None
     for f in file_peran(root, "readme") + file_peran(root, "dev"):
         m = re.search(r"agent-workflow v(\d+(?:\.\d+)*)", f.read_text(encoding="utf-8", errors="replace"))
@@ -239,7 +266,8 @@ def main():
     print(f"Root: {root}")
     print(f"Penanda versi tertulis: {'v' + tertulis if tertulis else 'tidak ada'} | file secret lokal: "
           f"{'ada' if kondisi['bila_secret'] else 'tidak ada'} | UI: {'ada' if kondisi['bila_ui'] else 'tidak ada'}"
-          f" | Orca: {'ada' if kondisi['bila_orca'] else 'tidak ada'}")
+          f" | Orca: {'ada' if kondisi['bila_orca'] else 'tidak ada'}"
+          f" | sesi samping: {'ada' if kondisi['bila_side_session'] else 'tidak ada'}")
     per_versi, hilang = {}, []
     for versi, pid, specs, syarat, lab in penanda:
         if not all(kondisi.get(s, True) for s in syarat):

@@ -40,6 +40,7 @@ Tidak diterjemahkan, karena sejak v3.20 berbahasa Inggris di setiap bahasa proto
 - T9 — `handoff/STRUCTURE.md` (peta struktur)
 - T10 — `handoff/SKILL-FEEDBACK.md` (celah skill)
 - Penyesuaian per Jenis Project
+- T11–T12 (sesi samping, modul pilihan) ada di `references/side-session.md`
 
 ### T1 — Instruksi Head (`<prefix>-head/SKILL.md`)
 ~~~markdown
@@ -78,13 +79,14 @@ Executor project ini adalah {{TOOL_EXECUTOR}} / {{MODEL_EXECUTOR}} dengan kapasi
    - File baru dari executor harus berada di lokasi sesuai `handoff/STRUCTURE.md`. Yang tidak sesuai dipindah di task berikutnya, atau petanya diperbarui bila memang butuh tempat baru.
    - **Tanda triase.** Setelah report diverifikasi, tulis `- Triase head: lolos <tanggal>` (atau `koreksi → TASK-NNN`) di file task-nya. Task yang berprasyarat task itu menunggu tanda ini, bukan status DONE dari executor. Task lama tanpa tanda yang dirujuk sebagai prasyarat diberi tanda saat kamu menulis task barunya. <!-- aw: D1 -->
    - **Sumber daya eksklusif.** Sebelum menjalankan perintah verifikasi, cek task `IN_PROGRESS` yang header `Memakai:`-nya menyebut sumber daya yang sama (port, perangkat, server uji). Selama dipakai, jalankan hanya pemeriksaan yang membaca file.
+   - **Serah-terima sesi samping** (`handoff/<peran>-handoff.md`, bila project punya sesi samping): baris §Keputusan untuk Head yang Status head-nya kosong diperiksa seperti report sebelum dicatat. Buka setiap `file:baris` di kolom Dasar dan cocokkan isinya; telusuri angka ke asalnya (report, log, atau hitung ulang); baca bagian sumber luar yang dirujuk. Klaim yang belum terbukti tetap HYPOTHESIS sampai sebuah task membuktikannya. Dampak (butir ROADMAP, task) melewati gerbang arah (langkah 3). Keputusan yang bertentangan dengan register keputusan atau pagar pengaman ditanyakan ke user dulu (WAIT-USER), dan Status head-nya diisi sesudah dijawab. Isi Status head dengan `dicek <tanggal>`, `dikoreksi <tanggal>: <yang dikoreksi>`, atau `ditolak <tanggal>: <alasan>`, lalu catat yang lolos di register NOTES dan ROADMAP. <!-- aw: S8 -->
 3. **Gerbang arah** (sebelum membuat task): <!-- aw: B2 -->
    - **Anggaran:** maksimal 3 task MEASURE per pertanyaan. Setelah itu eskalasi, catat sebagai Batasan Diterima, atau rumuskan pertanyaan baru. Sebelum menutup sebagai batasan, bandingkan spec dengan konfigurasi nyata; selisihnya menjadi Tugas User.
    - **Ritme:** dari tiap 3 task, minimal 1 FIX/FEATURE dari backlog, kecuali ada regresi. Bila backlog FIX/FEATURE di jalur fokus sudah habis, mintalah prioritas baru ke user; jangan mengisi ritme dengan SMOKE/DOC. <!-- aw: V3-6 -->
    - **Task STRUCTURE** tidak dihitung sebagai FIX/FEATURE. Maksimal 1 per 5 task, kecuali user meminta lebih.
    - **Task FACT** diperlakukan seperti MEASURE untuk anggaran dan ritme. <!-- aw: L2 -->
    - **Ketergantungan:** FEATURE hanya ditunda bila benar-benar bergantung.
-   - **Mutu keputusan:** untuk keputusan atau rekomendasi penting, bandingkan minimal dua opsi termasuk "biarkan". Pilih yang terbaik untuk konteks project berdasarkan bukti dan sumber, bukan kebiasaan umum. Catat alasan dan opsi yang ditolak di register keputusan. <!-- aw: S4 -->
+   - **Mutu keputusan:** untuk keputusan atau rekomendasi penting, bandingkan minimal dua opsi termasuk "biarkan". Pilih yang terbaik untuk konteks project berdasarkan bukti dan sumber, bukan kebiasaan umum. Catat alasan dan opsi yang ditolak di register keputusan. Keputusan atau perintah user juga melewati uji ini: bila pilihan user gagal salah satu uji, atau ada opsi yang lebih baik menurut bukti, sampaikan sekali beserta buktinya sebelum menjalankannya. Keputusan tetap milik user: catat opsi yang kamu sarankan dan syarat buka-ulangnya di register, dan angkat lagi hanya dengan bukti baru. <!-- aw: S4 S7 -->
    - **WAIT-USER / Tugas User:** ajukan pertanyaan spesifik, lalu kerjakan item lain sambil menunggu.
 4. **Tulis task** dengan format di `handoff/README.md` §Format Task, sesuai kapasitas:
    - LOW → atomik, dengan potongan kode, perintah persis, dan output yang diharapkan; maksimal ±8 langkah, cabang hanya dalam tabel jika–maka (maks. 3). Semua angka dan keputusan lolos/gagal dikeluarkan **skrip penilai** (test acceptance untuk FIX/FEATURE, penganalisis log untuk MEASURE/SMOKE). Jalankan skrip itu dulu pada data contoh dan ambil nilai harapan dari hasilnya. Penantian dan dialog panjang dipindah ke alat. <!-- aw: R1 R3 -->
@@ -443,7 +445,7 @@ handoff/logs/<file>.log:<baris> | <kutipan persis>
 ## Periksa Diri (sebelum DONE) <!-- aw: W2 -->
 - Test acceptance dan perintah verifikasi diulang pada kode akhir: <jam>; output di report berasal dari run ini.
 - `git status --porcelain` (apa adanya):
-- `check_evidence.py` atas report ini: <N> masalah.
+- `check_evidence.py` atas report ini: <N> ERROR. <!-- aw: N22 -->
 - Setiap kriteria terima di task (K1, K2, …) punya baris di tabel Data: ya / tidak (sebutkan).
 ## Keputusan Implementasi yang Diambil
 (FIX/FEATURE/SPIKE: pilihan, alasan, alternatif yang ditolak. MEASURE/SMOKE: "-".)
@@ -469,7 +471,7 @@ description: "Mode pengembangan {{PROJECT}}: muat NOTES + ROADMAP, pilih pekerja
 # {{PROJECT}} — Dev
 > Dibuat dengan skill **agent-workflow v{{VERSI_SKILL}}** ({{tanggal}}). Untuk memperbarui protokol ke versi skill yang lebih baru, jalankan skill agent-workflow (mode AUDIT, jalur upgrade). <!-- aw: U1 -->
 1. Muat `NOTES.md` dan `ROADMAP.md`.
-2. Pilih item yang masuk fokus. Investigasi maksimal 3 sesi per pertanyaan; setiap 3 sesi harus ada minimal 1 FIX/FEATURE. Bila backlog fokus habis, tanyakan prioritas baru ke user. Untuk keputusan penting, terapkan **Mutu keputusan**: uji benar, perlu, terbaik untuk konteks (minimal dua opsi, termasuk "biarkan"), aman, dan bisa dikerjakan. <!-- aw: B2 V3-6 S4 -->
+2. Pilih item yang masuk fokus. Investigasi maksimal 3 sesi per pertanyaan; setiap 3 sesi harus ada minimal 1 FIX/FEATURE. Bila backlog fokus habis, tanyakan prioritas baru ke user. Untuk keputusan penting, terapkan **Mutu keputusan**: uji benar, perlu, terbaik untuk konteks (minimal dua opsi, termasuk "biarkan"), aman, dan bisa dikerjakan. Keputusan user juga diuji: opsi yang lebih baik menurut bukti disampaikan sekali beserta buktinya, keputusan tetap milik user, dan diangkat lagi hanya dengan bukti baru. <!-- aw: B2 V3-6 S4 S7 -->
 3. Verifikasi status item di kode sebelum dikerjakan.
 4. Kerjakan item itu. Klaim penyebab hanya dengan pembanding; selain itu tulis sebagai HYPOTHESIS. OK hanya bila nilai harapan terpenuhi. File baru mengikuti peta struktur di `NOTES.md` §1; pindah file hanya bertahap (satu kelompok, `git mv`, build ulang). <!-- aw: N14 -->
 5. Perbarui NOTES dan ROADMAP, tanpa nilai secret. Hasil di luar repo (Artifact, kanvas, purwarupa) dirujuk di sana beserta nama akun pemiliknya, dan sumber yang menjadi dasar implementasi disalin ke repo, bukan scratchpad sesi. Sebelum commit, jalankan `check_secrets.py --staged` bila terpasang. Untuk operasi berisiko ({{daftar}}), tanya user dulu. <!-- aw: C2 H2 -->
@@ -528,10 +530,10 @@ Berkas ter-track yang ditulis ulang hook atau tool tanpa disentuh task. Periksa 
 ~~~
 
 ### T10 — `handoff/SKILL-FEEDBACK.md` (celah skill)
-Dibuat BOOTSTRAP dan jalur upgrade; untuk versi ringkas dan LITE (di samping NOTES), dibuat saat entri pertama. Hanya head (LITE: skill dev) yang menulisnya, dan executor tidak membacanya. Pembacanya sesi yang meng-upgrade protokol (AUDIT, jalur upgrade), yang juga mengisi kolom Status.
+Dibuat BOOTSTRAP dan jalur upgrade; untuk versi ringkas dan LITE (di samping NOTES), dibuat saat entri pertama. Yang menulisnya head (LITE: skill dev) dan sesi samping bila ada (`references/side-session.md`, T11); executor tidak membacanya. Pembacanya sesi yang meng-upgrade protokol (AUDIT, jalur upgrade), yang juga mengisi kolom Status.
 ~~~markdown
 # Celah Skill agent-workflow
-> Ditulis head saat menemukan aturan atau alat protokol yang keliru, kurang, atau boros, alat cek yang meloloskan masalah, atau kelalaian head yang tidak dicegah protokol. Satu baris tabel per kejadian, atau satu butir `- <tanggal> · <kejadian> · <bukti> · <dampak> · <usul> · Status: baru` bila isinya terlalu panjang untuk tabel; tanpa nilai secret. Status diisi saat upgrade: `ditangani v<versi>` atau `ditolak: <alasan>`.
+> Ditulis head (atau sesi samping) saat menemukan aturan atau alat protokol yang keliru, kurang, atau boros, alat cek yang meloloskan masalah, atau kelalaian head yang tidak dicegah protokol. Satu baris tabel per kejadian, atau satu butir `- <tanggal> · <kejadian> · <bukti> · <dampak> · <usul> · Status: baru` bila isinya terlalu panjang untuk tabel; tanpa nilai secret. Status diisi saat upgrade: `ditangani v<versi>` atau `ditolak: <alasan>`.
 
 | Tanggal | Kejadian | Bukti | Dampak | Usul | Status |
 |---|---|---|---|---|---|

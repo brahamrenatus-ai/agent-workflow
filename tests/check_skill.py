@@ -2,7 +2,8 @@
 
 - frontmatter SKILL.md (nama, panjang description) dan versi yang sama di SKILL.md, changelog, dan plugin.json;
 - file yang dirujuk SKILL.md ada, fence Markdown seimbang, akhir baris LF, skrip bisa dikompilasi;
-- template T1–T9 lengkap, brief executor LOW (T2b) tetap ringkas, Pelajaran bernomor urut;
+- template T1–T9 lengkap (sejak v3.21 juga T11–T12 di references/side-session.md), brief executor LOW (T2b) tetap
+  ringkas, Pelajaran bernomor urut;
 - setiap penanda di blok `penanda` changelog punya baris tabel, teksnya ada di template yang menghasilkan file
   sasarannya, dan aturannya membawa tag `<!-- aw: ID -->` di setiap varian template (HIGH/MEDIUM, LOW, LITE).
 
@@ -84,6 +85,12 @@ for k in ("T1", "T2a", "T2b", "T3", "T4", "T5", "T6", "T7", "T8", "T9"):
     ada = f"### {k} " in tp
     cek(ada, f"templates.md punya {k}")
     seksi[k] = tp.split(f"### {k} ")[1].split("\n### ")[0].split("\n## Penyesuaian")[0] if ada else ""
+# Template sesi samping (modul pilihan, v3.21) ada di file sendiri, supaya hanya dibaca project yang memakainya.
+ss = baca("references/side-session.md") if (d / "references/side-session.md").is_file() else ""
+for k in ("T11", "T12"):
+    ada = f"### {k} " in ss
+    cek(ada, f"side-session.md punya {k}")
+    seksi[k] = ss.split(f"### {k} ")[1].split("\n### ")[0] if ada else ""
 m2b = re.search(r"~~~markdown\n(.*?)\n~~~", seksi["T2b"], re.S)
 cek(bool(m2b) and m2b.group(1).count("\n") + 1 <= 80, f"T2b (brief executor LOW) ≤ 80 baris ({m2b.group(1).count(chr(10)) + 1 if m2b else '-'})")
 pel = sk.split("## Pelajaran")[1].split("\n## ")[0] if "## Pelajaran" in sk else ""
@@ -100,8 +107,8 @@ cek(set(ids) <= tabel, f"setiap penanda punya baris tabel di changelog (kurang: 
 TAG = re.compile(r"<!--\s*aw:([^>]*?)-->")
 FILE_SEKSI = {"handoff/reports/REPORT_TEMPLATE.md": "T6", "handoff/STRUCTURE.md": "T9", "handoff/PROMPT_EXECUTOR.md": "T7",
               "handoff/README.md": "T3", "handoff/ROADMAP.md": "T4"}
-VARIAN = {"HIGH/MEDIUM": {"head": "T1", "executor": "T2a", "readme": "T3", "roadmap": "T4", "notes": "T5"},
-          "LOW": {"head": "T1", "executor": "T2b", "readme": "T3", "roadmap": "T4", "notes": "T5"},
+VARIAN = {"HIGH/MEDIUM": {"head": "T1", "executor": "T2a", "readme": "T3", "roadmap": "T4", "notes": "T5", "side": "T11"},
+          "LOW": {"head": "T1", "executor": "T2b", "readme": "T3", "roadmap": "T4", "notes": "T5", "side": "T11"},
           "LITE": {"dev": "T8", "notes": "T5", "roadmap": "T4"}}
 
 
@@ -145,8 +152,8 @@ for versi_p, pid, sisa in rows:
             continue
         cek(any(t for t, _ in hasil), f"penanda {pid} (v{versi_p}): teksnya ada di template ({nama_var})")
         cek(any(g for _, g in hasil), f"penanda {pid} (v{versi_p}): bertag <!-- aw: {pid} --> di template ({nama_var})")
-semua_tag = {i for m in TAG.finditer(tp) for i in re.split(r"[\s,]+", m.group(1).strip()) if i and i != "ID"}
-cek(semua_tag <= set(ids), f"setiap tag di templates.md menyebut penanda yang ada (asing: {sorted(semua_tag - set(ids))})")
+semua_tag = {i for m in TAG.finditer(tp + ss) for i in re.split(r"[\s,]+", m.group(1).strip()) if i and i != "ID"}
+cek(semua_tag <= set(ids), f"setiap tag di templates.md dan side-session.md menyebut penanda yang ada (asing: {sorted(semua_tag - set(ids))})")
 
 print(f"\nRESULT: {'ALL OK' if not gagal else f'{len(gagal)} FAILED'}")
 sys.exit(1 if gagal else 0)

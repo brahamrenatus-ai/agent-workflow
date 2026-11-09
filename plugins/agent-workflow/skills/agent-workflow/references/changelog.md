@@ -473,10 +473,26 @@ Perubahan lain tanpa penanda baru: uji di `tests/` mencetak `FAIL`, `SKIP`, dan 
 ## v3.20.2 (2026-11-09): alasan aturan ditulis sebagai pola kegagalan
 Tanpa aturan baru dan tanpa penanda. Alasan aturan di `SKILL.md` (pengantar dan Pelajaran), `references/` (changelog, enforcement, low-capacity, orca), docstring `check_evidence.py`, dan README repo kini ditulis sebagai pola kegagalan yang dicegahnya beserta alasan teknisnya. Catatan `references/orca.md` tentang sesi lain yang membaca terminal head dan catatan T10 tentang pembaca `handoff/SKILL-FEEDBACK.md` disederhanakan: file itu dibaca sesi yang meng-upgrade protokol, yang juga mengisi kolom Status. Aturan, penanda, dan perilaku alat tidak berubah, jadi project tidak perlu di-upgrade; salinan `check_evidence.py` di project hanya berbeda docstring-nya.
 
+## v3.21 (2026-11-09): sesi samping dan cek ulang keputusan user
+Alasan:
+- Sesi terpisah untuk diskusi, tanya-jawab, atau rancangan bersama user menghemat konteks head, tetapi head cenderung mencatat keputusan yang diserahkannya apa adanya. Rujukan `file:baris` yang sudah bergeser, angka hasil hitungan sesi itu, dan dugaan yang ditulis sebagai fakta lalu masuk register keputusan tanpa dicek. Modul pilihan `references/side-session.md` membakukan sesi itu (T11 instruksi sesi samping, T12 file serah-terima `handoff/<peran>-handoff.md`), dan head mengecek setiap baris serah-terima seperti report sebelum mencatatnya. Cek mesin atas kutipan di kolom Dasar belum ditambahkan: dasar keputusan sering memparafrasekan kode, merujuk commit tertentu, atau mengutip log dengan spasi dan tanda kutip yang dirapatkan, sehingga pencocokan teks per baris lebih banyak memberi tanda palsu daripada temuan.
+- Keputusan user dijalankan apa adanya walau ada opsi yang lebih baik menurut bukti, sehingga kekurangannya baru terlihat sesudah dikerjakan. Uji Mutu keputusan (§Kualitas Rekomendasi) kini juga berlaku untuk keputusan user: opsi yang lebih baik disampaikan sekali beserta buktinya, keputusan tetap milik user, dan hal itu diangkat lagi hanya dengan bukti baru.
+
+Modul sesi samping hanya dipasang bila dipakai, jadi project tanpa sesi samping tidak mendapat S8–S10 (`@bila_side_session`). Jenis penanda baru `side~teks` mencari teks di instruksi sesi samping: skill atau workflow yang menyebut file `handoff/...-handoff.md`, selain instruksi head, executor, dan dev. Perubahan lain tanpa penanda baru: T10 menyebut sesi samping sebagai penulis `handoff/SKILL-FEEDBACK.md`.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| S7 | Keputusan atau perintah user juga melewati uji Mutu keputusan: opsi yang lebih baik disampaikan sekali beserta buktinya, keputusan tetap milik user, diangkat lagi hanya dengan bukti baru | instruksi head, skill dev | T1 langkah 3 butir **Mutu keputusan** (LITE: T8 langkah 2) | – |
+| S8 | Head mengecek baris serah-terima sesi samping sebelum mencatatnya: `file:baris`, angka, dan sumber di kolom Dasar, HYPOTHESIS sampai terbukti, Dampak lewat gerbang arah, pertentangan dengan register atau pagar pengaman ditanyakan ke user; Status head `dicek`/`dikoreksi`/`ditolak` | instruksi head | T1 langkah 2 butir **Serah-terima sesi samping**, menggantikan butir yang hanya mencatat; kepala file serah-terima menyebut nilai Status head (T12) | – |
+| S9 | Sesi samping menguji keputusan user seperti S7 dan menulis Dasar yang bisa dicek head (`file:baris` dengan kutipan, asal angka, HYPOTHESIS) | instruksi sesi samping | T11 §Sikap dan §Keputusan untuk Head | – |
+| S10 | Sesi samping boleh menulis satu baris di `handoff/SKILL-FEEDBACK.md` | instruksi sesi samping | T11 §Wilayah | – |
+| N22 | Bagian Periksa Diri di REPORT_TEMPLATE memakai label `ERROR` dari `check_evidence.py` (v3.20.1) | `handoff/reports/REPORT_TEMPLATE.md` | T6 §Periksa Diri: `<N> ERROR` | – |
+
 ## Penanda
-Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca]`.
+Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca] [@bila_side_session]`.
 - **Jenis penanda:**
   - `head~teks`, `executor~teks`, `dev~teks`: teks ada di instruksi peran itu;
+  - `side~teks`: teks ada di instruksi sesi samping, yaitu skill atau workflow yang menyebut file `handoff/...-handoff.md`, selain instruksi head, executor, dan dev (v3.21);
   - `readme~teks`, `roadmap~teks`, `notes~teks`: teks ada di file `handoff/` yang bersangkutan;
   - `file:path~teks`: teks ada di file tertentu;
   - `ada~path`: file itu ada;
@@ -487,6 +503,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 - **`@bila_secret`:** penanda itu hanya berlaku bila project punya file secret lokal.
 - **`@bila_ui`:** penanda itu hanya berlaku bila project punya antarmuka pengguna: framework UI di `package.json` (React, Vue, Svelte, Angular, Next, Vite, Electron, React Native, …), Flutter, atau file khas UI (`*.html`, `*.vue`, `*.svelte`, `*.jsx`, `*.tsx`, `*.xaml`, `*.storyboard`, `*.qml`, `AndroidManifest.xml`) di luar `handoff/` dan folder hasil build.
 - **`@bila_orca`:** penanda itu hanya berlaku bila protokol mencatat bahwa head menjalankan executor lewat Orca, yaitu bila `handoff/README.md` atau instruksi head memuat perintah `orca orchestration` atau `orca terminal` (sejak v3.18; sebelumnya cukup kata `Orca`). Project yang baru akan memakai Orca belum mendapat kandidat ini dari `check_version.py`; AUDIT menanyakannya di putaran tanya (SKILL.md §2), lalu memasang D4–D6.
+- **`@bila_side_session`:** penanda itu hanya berlaku bila project punya sesi samping, yaitu file `*-handoff.md` di `handoff/` (di luar `tasks/`, `reports/`, `logs/`, dan `tools/`), mis. `handoff/discussion-handoff.md` (v3.21).
 
 ```penanda
 2.1  B1    ada~handoff/ROADMAP.md || ada~ROADMAP.md
@@ -639,4 +656,9 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.20.1 Y20 file:handoff/tools/orca_wait.py~Output diawali MESSAGE  @bila_orca
 3.20.1 Y21 file:handoff/tools/head_restart.py~Output diawali SCHEDULED  @bila_orca
 3.20.1 Y22 file:handoff/tools/check_secrets.py~"WARNING:  @bila_secret
+3.21 S7    head~hanya dengan bukti baru || dev~hanya dengan bukti baru
+3.21 S8    head~Serah-terima sesi samping  @bila_side_session
+3.21 S9    side~hanya dengan bukti baru  @bila_side_session
+3.21 S10   side~SKILL-FEEDBACK  @bila_side_session
+3.21 N22   file:handoff/reports/REPORT_TEMPLATE.md~<N> ERROR
 ```
