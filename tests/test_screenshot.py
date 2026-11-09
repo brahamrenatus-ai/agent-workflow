@@ -114,6 +114,8 @@ def jalan(*args):
 
 
 def ukuran_png(p):
+    if not p.is_file():  # tangkapan gagal dibuat: cek ini FAIL, cek berikutnya tetap berjalan
+        return None
     b = p.read_bytes()
     return struct.unpack(">II", b[16:24]) if b[:8] == b"\x89PNG\r\n\x1a\n" else None
 

@@ -2,7 +2,11 @@
 
 Pemakaian (dari root repo): python tests/run_tests.py [folder skill]
 Bawaan folder skill: plugins/agent-workflow/skills/agent-workflow. Butuh Python 3.9+ dan git di PATH.
+Uji yang gagal dicetak dengan semua baris keluarannya selain baris lulus (OK/PASS), termasuk traceback utuh.
+Di GitHub Actions (GITHUB_ACTIONS=true) setiap uji yang gagal juga dicetak sebagai anotasi ::error, yang
+terbaca lewat API anotasi publik tanpa login (log job butuh login).
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -31,18 +35,32 @@ UJI = [
     ("test_screenshot", [S]),  # dilewati bila Chrome, Chromium, atau Edge tidak ada
     ("test_orca_cli", [S]),  # dilewati bila Orca tidak terpasang
 ]
+DI_ACTIONS = os.environ.get("GITHUB_ACTIONS") == "true"
+
+
+def perintah_actions(teks, properti=False):
+    """Escape teks untuk perintah alur kerja GitHub Actions; nilai properti (title) juga meng-escape ':' dan ','."""
+    teks = teks.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return teks.replace(":", "%3A").replace(",", "%2C") if properti else teks
+
+
 gagal = []
 for nama, args in UJI:
     r = subprocess.run([sys.executable, "-X", "utf8", str(T / f"{nama}.py"), *map(str, args)],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    out = r.stdout + r.stderr
-    salah = [l for l in out.splitlines() if l.startswith("FAIL") or "SOME FAILED" in l or "Traceback" in l]
+    baris = (r.stdout + r.stderr).splitlines()
+    salah = [l for l in baris if l.startswith("FAIL") or "SOME FAILED" in l or "Traceback" in l]
     if r.returncode == 0 and not salah:
-        ringkas = next((l for l in reversed(out.splitlines()) if l.startswith("RESULT")), "")
+        ringkas = next((l for l in reversed(baris) if l.startswith("RESULT")), "")
         print(f"PASS   {nama}: {ringkas}")
-    else:
-        gagal.append(nama)
-        print(f"FAIL   {nama} (exit {r.returncode})")
-        print("\n".join("       " + l for l in (salah or out.splitlines())[-25:]))
+        continue
+    gagal.append(nama)
+    # Semua baris selain baris lulus, supaya traceback tercetak utuh, bukan hanya baris pertamanya.
+    rinci = [l for l in baris if l.strip() and not l.startswith(("OK", "PASS"))][-60:] or baris[-25:]
+    print(f"FAIL   {nama} (exit {r.returncode})")
+    print("\n".join("       " + l for l in rinci))
+    if DI_ACTIONS:
+        pesan = chr(10).join(rinci[-40:]) or "(no output)"
+        print(f"::error title={perintah_actions(f'{nama} (exit {r.returncode})', True)}::{perintah_actions(pesan)}")
 print(f"\n{'ALL TESTS PASSED' if not gagal else 'FAILED: ' + ', '.join(gagal)} ({len(UJI) - len(gagal)}/{len(UJI)})")
 sys.exit(1 if gagal else 0)
