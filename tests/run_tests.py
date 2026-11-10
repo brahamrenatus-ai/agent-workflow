@@ -28,6 +28,7 @@ UJI = [
     ("test_record", [S]),
     ("test_check_secrets", [S / "scripts" / "check_secrets.py"]),
     ("test_check_process_notes", [S]),
+    ("test_brief", [S]),
     ("test_redact_provenance", [S]),
     ("test_calibrate", [S]),
     ("test_orca_wait", [S]),

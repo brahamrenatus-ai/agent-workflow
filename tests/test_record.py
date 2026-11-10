@@ -153,6 +153,25 @@ try:
         cek(r.returncode == 0 and b"halo dari PowerShell" in isi, "--pwsh: perintah PowerShell dijalankan", r.stderr.decode(errors="replace"))
     else:
         print("SKIP  --pwsh: PowerShell tidak ada di mesin ini")
+    # v3.23: log di luar folder project tidak dicatat di provenance.jsonl project
+    luar = tmp / "luar"
+    luar.mkdir()
+    berkas_asal = proj / "handoff/logs/provenance.jsonl"
+    sebelum = berkas_asal.read_bytes()
+    r = catat(proj, str(luar / "uji.log"), f'"{sys.executable}" -c "print(41 + 1)"')
+    galat = r.stderr.decode(errors="replace")
+    cek(r.returncode == 0 and (luar / "uji.log").is_file() and (luar / "uji.log").read_bytes().strip() == b"42",
+        "log di luar project tetap ditulis dan kode keluar diteruskan", galat)
+    cek(berkas_asal.read_bytes() == sebelum and "TIDAK dicatat" in galat,
+        "log di luar project tidak menambah provenance.jsonl project, dan itu disebut", galat)
+    hasil_luar = (luar / "hasil.csv").as_posix()
+    r = catat(proj, "handoff/logs/dalam.log", f'"{sys.executable}" -c "open(\'{hasil_luar}\', \'w\').write(\'x\')"',
+              "--result", hasil_luar)
+    galat = r.stderr.decode(errors="replace")
+    baru = berkas_asal.read_bytes()[len(sebelum):].decode("utf-8")
+    cek(r.returncode == 0 and [json.loads(b)["file"] for b in baru.splitlines()] == ["handoff/logs/dalam.log"]
+        and "di luar folder project; tidak dicatat" in galat,
+        "--result di luar project tidak dicatat, log di dalamnya tetap dicatat", galat + baru)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 print("\nRESULT:", "ALL OK" if ok else "SOME FAILED")

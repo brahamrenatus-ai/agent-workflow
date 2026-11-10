@@ -26,6 +26,7 @@ Opsi:
   --allow-host HOST bersama --offline: host lain yang tetap boleh dihubungi, mis. API uji di jaringan lokal (bisa berulang;
                     nama host atau IP tanpa port, boleh berpola seperti *.lan)
   --wait MS         jeda sesudah halaman termuat, untuk render JavaScript (bawaan 1500)
+  --startup-timeout S  detik menunggu browser siap per percobaan (bawaan 15); browser yang belum siap dicoba sekali lagi
 Nama opsi sebelum v3.12 (--ukuran, --luring, --tunggu) tetap diterima.
 Browser dicari di variabel CHROME, lalu lokasi umum Chrome, Chromium, dan Edge.
 Exit code: 0 = semua ukuran tanpa elemen keluar layar, 1 = ada halaman lebih lebar dari layar atau elemen keluar
@@ -233,35 +234,48 @@ def aturan_luring(kecuali=()):
     return "MAP * ~NOTFOUND" + "".join(f" , EXCLUDE {h}" for h in (*HOST_LOKAL, *kecuali))
 
 
-def buka_browser(exe, profil, luring, kecuali=()):
+def buka_browser(exe, profil, luring, kecuali=(), batas=15, coba=2):
     """kecuali: host tambahan yang tetap di-resolve saat luring, mis. alamat perangkat yang halamannya difoto.
-    Alat project lain (mis. pengamat bench) boleh memanggil fungsi ini dengan argumen yang sama."""
+    Alat project lain (mis. pengamat bench) boleh memanggil fungsi ini dengan argumen yang sama.
+    batas: detik menunggu DevTools per percobaan; coba: jumlah percobaan. Di mesin yang sibuk, browser kadang
+    belum siap dalam batas itu walau percobaan berikutnya langsung berhasil."""
     args = [exe, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--hide-scrollbars",
             "--disable-extensions", f"--user-data-dir={profil}", "--remote-debugging-port=0", "about:blank"]
     if luring:
         args.insert(1, f"--host-resolver-rules={aturan_luring(kecuali)}")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         args.insert(1, "--no-sandbox")  # Chrome menolak berjalan sebagai root (mis. di container) tanpa ini
-    proses = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     berkas = Path(profil) / "DevToolsActivePort"
-    for _ in range(150):
-        port = baca_port(berkas)
-        if port:
-            buka = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            for _ in range(50):
-                try:
-                    tab = [t for t in json.loads(buka.open(f"http://127.0.0.1:{port}/json/list", timeout=5).read())
-                           if t.get("type") == "page"]
-                    if tab:
-                        return proses, tab[0]["webSocketDebuggerUrl"]
-                except OSError:
-                    pass
-                time.sleep(0.1)
-        if proses.poll() is not None:
-            break
-        time.sleep(0.1)
-    proses.kill()
-    raise RuntimeError("browser tidak membuka DevTools dalam 15 detik")
+    for ke in range(max(1, coba)):
+        proses = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(max(1, int(batas * 10))):
+            port = baca_port(berkas)
+            if port:
+                buka = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                for _ in range(50):
+                    try:
+                        tab = [t for t in json.loads(buka.open(f"http://127.0.0.1:{port}/json/list", timeout=5).read())
+                               if t.get("type") == "page"]
+                        if tab:
+                            return proses, tab[0]["webSocketDebuggerUrl"]
+                    except OSError:
+                        pass
+                    time.sleep(0.1)
+            if proses.poll() is not None:
+                break
+            time.sleep(0.1)
+        proses.kill()
+        try:
+            proses.wait(timeout=5)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        try:
+            berkas.unlink()  # port percobaan yang gagal tidak boleh terbaca oleh percobaan berikutnya
+        except OSError:
+            pass
+        if ke + 1 < max(1, coba):
+            print(f"[screenshot] browser belum membuka DevTools dalam {batas:g} detik; mencoba sekali lagi", file=sys.stderr)
+    raise RuntimeError(f"browser tidak membuka DevTools dalam {batas:g} detik ({max(1, coba)} percobaan)")
 
 
 def buka_halaman(cdp, url, batas=30):
@@ -305,6 +319,8 @@ def main():
     ap.add_argument("--allow-host", dest="izinkan", action="append", default=[], metavar="HOST",
                     help="bersama --offline: host lain yang tetap boleh dihubungi (bisa berulang; tanpa port)")
     ap.add_argument("--wait", dest="tunggu", type=int, default=1500, metavar="MS", help="jeda sesudah halaman termuat, dalam ms (bawaan 1500)")
+    ap.add_argument("--startup-timeout", dest="batas_mulai", type=float, default=15, metavar="S",
+                    help="detik menunggu browser siap per percobaan; dicoba dua kali (bawaan 15)")
     # Nama opsi sebelum v3.12, tetap diterima tanpa tampil di --help.
     ap.add_argument("--ukuran", dest="ukuran", nargs="+", help=argparse.SUPPRESS)
     ap.add_argument("--luring", dest="luring", action="store_true", help=argparse.SUPPRESS)
@@ -345,7 +361,7 @@ def main():
     proses, ws = None, None
     ada_masalah = False
     try:
-        proses, alamat = buka_browser(exe, profil, a.luring, kecuali)
+        proses, alamat = buka_browser(exe, profil, a.luring, kecuali, batas=a.batas_mulai)
         ws = WebSocket(alamat)
         cdp = DevTools(ws)
         cdp("Page.enable")

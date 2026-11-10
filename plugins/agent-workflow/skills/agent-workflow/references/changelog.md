@@ -506,6 +506,32 @@ Butir **Hasil di luar repo** (H2) kini merujuk tautan dan keputusan atas hasil d
 | G5 | Executor menjalankan `check_process_notes.py --worktree` di Periksa Diri dan menulis ulang baris tambahannya yang ditandai; temuan di wilayah head dibiarkan | brief executor | T2a langkah 5 / T2b langkah 6 | – |
 | Y23 | Alat `check_process_notes.py` terpasang | `handoff/tools/check_process_notes.py` | Salin `scripts/check_process_notes.py`, lalu jalankan `--all --summary` sekali: path ter-track yang bukan file produk masuk `EXCLUDE`, kata domain yang memang isi produk masuk `ALLOW`. Isi lama yang ditandai disampaikan ke user beserta jumlahnya; pembersihannya butuh izin user | – |
 
+## v3.23 (2026-11-11): bacaan awal sesi head yang dipendekkan, perbaikan alat
+Alasan: NOTES dan ROADMAP tumbuh bersama umur project. Register keputusan, backlog, kotak usulan, dan tugas user hanya bertambah, sehingga sesi head yang membaca keduanya utuh di langkah 1 bisa menghabiskan lebih dari separuh konteksnya sebelum mulai bekerja, padahal sebagian besar isinya baris yang sudah tertutup. Batas ukuran yang ada hanya menjaga ROADMAP §1. Alat `scripts/brief.py` mencetak bacaan awal itu tanpa mengubah file.
+
+Yang dicetak `brief.py`:
+- Bagian (`## `) sampai 6 KB (`--limit`) apa adanya. §1 dan §2 ROADMAP selalu utuh, begitu juga judul di `FULL` (kepala salinan alat) atau `--full <teks>`.
+- Bagian yang lebih besar: baris tabel tertutup disembunyikan dan jumlahnya disebut, yaitu sel kolom `Status` yang berawalan `DONE`, usulan yang kolom `Keputusan`-nya sudah berisi terima, tolak, atau parkir, dan isi sub-bagian `### Selesai`. Baris lain dipotong 200 karakter (`--cut`) dengan awalan `[L<nomor baris>]`. Baris register keputusan tidak disembunyikan, hanya dipotong.
+- Baris `TASKS`: jumlah file task, nomor terakhir, task `OPEN`, `IN_PROGRESS`, dan `BLOCKED`, serta task `DONE` tanpa tanda triase sesudah task bertanda yang terakhir.
+- Risikonya keputusan lama terlewat karena barisnya dipotong. Karena itu head mencari topik di file aslinya sebelum memutuskan, dan register dibaca utuh saat retrospektif (`--full register`).
+
+Perbaikan alat:
+- `record.py` tidak lagi mencatat asal log yang berada di luar folder project (mis. scratchpad sesi) ke `handoff/logs/provenance.jsonl`. Catatan seperti itu merujuk file yang tidak ikut repo, dan membersihkannya berisiko menghapus catatan lain. `--result` di luar project juga dilewati.
+- `screenshot.py` mencoba sekali lagi bila browser belum membuka DevTools dalam batas waktu (bawaan 15 detik per percobaan, `--startup-timeout`). Di mesin yang sibuk percobaan pertama kadang gagal walau browsernya ada.
+
+Susunan T1: bagian **Peran** dan **Aturan User** kini berada di atas **Langkah**. Sesudah ringkas otomatis, Claude Code hanya membawa awal instruksi skill, sehingga aturan user di ujung file ikut hilang. Saat upgrade, kedua bagian itu dipindah ke atas tanpa mengubah isinya; perubahan ini tidak punya penanda.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| H4 | Bacaan awal sesi lewat `brief.py`; baris yang dipotong dibuka di filenya, dan topik dicari di file asli sebelum memutuskan | instruksi head, skill dev | T1 langkah 1 butir **Bacaan awal**, menggantikan butir baca NOTES dan ROADMAP, daftar task, dan report yang belum dianalisis; T8 langkah 1 | – |
+| D19 | Tanda triase mengisi baris `Triase head:` yang sudah ada atau ditambah di akhir file, tidak disisipkan, karena baris sisipan menggeser nomor baris yang dikutip report | instruksi head | T1 langkah 2 butir **Tanda triase** | – |
+| G6 | Commit dengan daftar path berkas, bukan folder | instruksi head | T1 langkah 5 butir **Isi commit**, kalimat terakhir | – |
+| K9 | Kriteria hitungan ditulis sebagai `hitung(file, "pola")` yang dinilai `check_evidence.py`, bukan perintah `rg -c` di sel tabel; pola tanpa `|` | instruksi head | T1 langkah 4 butir **Kriteria hitungan** | – |
+| H5 | Alat analisis yang menjadi dasar keputusan disimpan di `handoff/tools/`, bukan scratchpad sesi | instruksi head | T1 langkah 5 butir **Hasil di luar repo** | – |
+| Y24 | Alat `brief.py` terpasang | `handoff/tools/brief.py` | Salin `scripts/brief.py`, lalu jalankan sekali dari root project. `FULL` diisi judul bagian yang harus selalu utuh di project itu | – |
+| Y25 | `record.py` melewati log di luar folder project | `handoff/tools/record.py` | Salin ulang `scripts/record.py` | – |
+| I7 | `screenshot.py` mencoba ulang saat browser belum siap | `handoff/tools/screenshot.py` | Salin ulang `scripts/screenshot.py`; tambalan lokal dibawa | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca] [@bila_side_session]`.
 - **Jenis penanda:**
@@ -682,4 +708,12 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.22 G4    head~check_process_notes || dev~check_process_notes
 3.22 G5    executor~check_process_notes
 3.22 Y23   ada~handoff/tools/check_process_notes.py
+3.23 H4    head~brief.py || dev~brief.py
+3.23 D19   head~menggeser nomor baris
+3.23 G6    head~path berkas, bukan folder
+3.23 K9    head~Kriteria hitungan
+3.23 H5    head~Alat analisis
+3.23 Y24   ada~handoff/tools/brief.py
+3.23 Y25   file:handoff/tools/record.py~def di_luar_project
+3.23 I7    file:handoff/tools/screenshot.py~--startup-timeout  @bila_ui
 ```

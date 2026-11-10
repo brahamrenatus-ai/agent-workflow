@@ -5,6 +5,7 @@ Pemakaian: python -X utf8 tests/test_screenshot.py <folder skill>"""
 import http.server
 import importlib.util
 import inspect
+import os
 import shutil
 import struct
 import subprocess
@@ -215,6 +216,14 @@ try:
         uji_host_perangkat(tmp)
     else:
         print("SKIP  uji host perangkat: screenshot.py versi lama")
+    # v3.23: browser yang tidak siap dicoba sekali lagi (browser palsu = interpreter Python, yang langsung keluar)
+    r = subprocess.run([sys.executable, "-X", "utf8", str(SKRIP), str(tmp / "jebakan.html"), str(tmp / "out/palsu"),
+                        "--startup-timeout", "2"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=120, env=dict(os.environ, CHROME=sys.executable))
+    cek(r.returncode != 0 and "mencoba sekali lagi" in r.stderr and "2 percobaan" in r.stderr,
+        "browser yang tidak siap dicoba sekali lagi; pesan gagal menyebut jumlah percobaan", r.stdout + r.stderr)
+    rc, out = jalan("--help")
+    cek(rc == 0 and "--startup-timeout" in out, "--help memuat --startup-timeout", out[-400:])
     rc, out = jalan(tmp / "tidak-ada.html", tmp / "out/x")
     cek(rc == 2 and "bukan URL dan bukan file" in out, "file yang tidak ada: exit 2", out)
     rc, out = jalan(tmp / "jebakan.html", tmp / "out/x", "--sizes", "375kali812")

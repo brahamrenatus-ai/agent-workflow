@@ -75,6 +75,15 @@ def relatif(p):
         return p
 
 
+def di_luar_project(p):
+    """True bila path berada di luar folder kerja (root project), mis. scratchpad sesi atau folder sementara."""
+    try:
+        Path(p).resolve().relative_to(Path.cwd().resolve())
+        return False
+    except ValueError:
+        return True
+
+
 def status_task(log):
     """(nomor, status) task pemilik log `TASK-NNN-*`, mis. ("049", "DONE"); None bila bukan log task atau task tidak ada."""
     m = re.match(r"TASK-(\d+[A-Za-z]?)(?=[-_.]|$)", log.name, re.I)
@@ -147,11 +156,21 @@ def main():
                 pass
         kode = p.wait()
     selesai = waktu()
+    if di_luar_project(log):
+        # Log di luar project bukan bukti report: mencatatnya akan mengisi provenance.jsonl repo dengan path yang
+        # tidak ikut repo, dan membersihkannya nanti berisiko menghapus catatan lain.
+        print(f"[record] {log.as_posix()}: kode keluar {kode}; log berada di luar folder project, jadi asalnya TIDAK "
+              f"dicatat di {ASAL.as_posix()}. Bukti report disimpan di dalam project (handoff/logs/), dan skrip ini "
+              "dijalankan dari root project.", file=sys.stderr)
+        return kode
     catat(log, a.perintah, mulai, selesai, kode, "log", a.tambah)
     sudah = {log.resolve()}
     for h in a.hasil:
         baru, lama = daftar_hasil(h, sejak)
         for ph in map(relatif, baru):
+            if di_luar_project(ph):
+                print(f"[record] --result {ph.as_posix()} berada di luar folder project; tidak dicatat", file=sys.stderr)
+                continue
             if ph.resolve() not in sudah:
                 sudah.add(ph.resolve())
                 catat(ph, a.perintah, mulai, selesai, kode, "hasil", False)
