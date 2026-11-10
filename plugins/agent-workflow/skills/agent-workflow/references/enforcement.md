@@ -85,5 +85,12 @@ Orca menambahkan flag izin saat meluncurkan agen (`worker-start`, `agent launch`
   fi
   exit 0
   ```
+- **Hook catatan proses:** commit yang menambah catatan proses ke file produk, atau pesan commit-nya, ditolak. Alat melewati pesan commit yang hanya membawa file lapisan agen:
+  ```sh
+  #!/bin/sh
+  # .githooks/commit-msg (tambahkan ke hook yang sudah ada)
+  python handoff/tools/check_process_notes.py --staged --message "$1" || { echo "Commit ditolak: catatan proses di file produk atau pesan commit."; exit 1; }
+  ```
+  Di repo tim yang tidak memuat `handoff/`, hook bersama tidak boleh menyebut `handoff/`. Simpan hook di folder lokal di dalam `handoff/` (mis. `handoff/hooks/`), dengan penerus untuk setiap hook bersama (`.githooks/<nama hook> "$@" || exit 1` lebih dulu), lalu jalankan `git config core.hooksPath handoff/hooks` di mesin itu saja. Git hanya membaca satu folder hook, jadi hook bersama dipanggil dari hook lokal.
 - **Berbagi hook:** simpan di folder ter-commit (mis. `.githooks/`), lalu jalankan `git config core.hooksPath .githooks`.
 - **Secret yang sudah terlanjur masuk riwayat git:** penegakan tidak bisa menghapusnya. Buat Tugas User untuk mengganti kuncinya.

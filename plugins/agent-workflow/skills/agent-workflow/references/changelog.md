@@ -488,6 +488,24 @@ Modul sesi samping hanya dipasang bila dipakai, jadi project tanpa sesi samping 
 | S10 | Sesi samping boleh menulis satu baris di `handoff/SKILL-FEEDBACK.md` | instruksi sesi samping | T11 §Wilayah | – |
 | N22 | Bagian Periksa Diri di REPORT_TEMPLATE memakai label `ERROR` dari `check_evidence.py` (v3.20.1) | `handoff/reports/REPORT_TEMPLATE.md` | T6 §Periksa Diri: `<N> ERROR` | – |
 
+## v3.22 (2026-11-10): file produk tanpa catatan proses
+Alasan: catatan proses kerja masuk ke file produk. Bentuknya antara lain kepala test yang menyebut peran penulisnya beserta larangan untuk executor, komentar yang menyebut nomor task, report, atau keputusan user, dokumen rancangan yang memuat nama sesi, model, dan tautan Artifact, serta baris bahasa dokumen dan riwayat tinjauan internal di dokumen kontrak. Catatan seperti itu tidak menjelaskan kode, tertinggal saat kode berubah, ikut ter-push, dan di repo tim yang tidak memuat `handoff/` terbaca anggota yang tidak memakai alur agen. Aturan tertulis saja tidak cukup, karena frasanya muncul di sela pekerjaan biasa. Karena itu alat baru `scripts/check_process_notes.py` memeriksa baris tambahan sebelum commit di tiga titik: Periksa Diri executor (`--worktree`), commit head (`--staged --message`), dan hook bila dipasang (`references/enforcement.md`).
+
+Yang diperiksa alat itu:
+- `PROCESS`: frasa proses kerja (siapa menulis, memutuskan, atau mengecek; sesi dan model agen; kutipan dan persetujuan user; tinjauan internal; bahasa dokumen; tautan sesi). Kata peran ditulis huruf kecil di dalam frasa, sehingga `HEAD` git, `<head>` HTML, dan thread pool executor tidak ikut; kutipan `user: "..."` hanya dihitung di dokumen dan komentar.
+- `REF`: nomor task, report, dan item (mis. `TASK-012`, `R-FIX-01`) di semua file produk. Rujukan lapisan agen (`handoff/`, `ROADMAP §3`, `register NOTES`, `*-handoff.md`) hanya bila `handoff/` tidak ter-track di repo itu, karena di repo yang memuat `handoff/` rujukan itu tautan yang berjalan dan pola file ignore untuk log `handoff/` memang perlu.
+- File produk adalah file teks di luar lapisan agen: `handoff/`, folder instruksi agen per tool, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `CONVENTIONS.md`, dan NOTES/ROADMAP di root project LITE. `--message` memeriksa pesan commit dan deskripsi PR: `PROCESS` selalu, `REF` hanya bila `handoff/` tidak ter-track, karena di repo lain nomor task memang tempatnya di pesan commit. Komentar git dan trailer atribusi tidak diperiksa.
+- Isi lama tidak menghalangi commit, karena `--staged` dan `--worktree` hanya memeriksa baris yang ditambah atau diubah. `--all --summary` menghitung isi lama untuk AUDIT; pembersihannya satu perubahan per project yang butuh izin user.
+- Penyesuaian per project ada di kepala salinan alat, seperti `SECRET_FILES` di `check_secrets.py`: `EXCLUDE` untuk path ter-track yang bukan file produk, `ALLOW` untuk kata domain yang mirip catatan proses (mis. "user" sebagai pengguna aplikasi). Keduanya dibawa dari salinan lama saat upgrade.
+
+Butir **Hasil di luar repo** (H2) kini merujuk tautan dan keputusan atas hasil di luar repo di ROADMAP atau catatan `handoff/`, bukan di dokumen rancangan, karena tautan sesi di dokumen produk juga catatan proses. Perubahan ini dipasang bersama G4 dan tidak punya penanda sendiri.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| G4 | File produk hanya memuat isi teknis: catatan proses dan nomor task, report, atau item ROADMAP ditulis di `handoff/` (dan di pesan commit bila `handoff/` ikut repo); dokumen rancangan tanpa jejak peran atau persetujuan; `check_process_notes.py --staged --message` sebelum commit, `--worktree --message` sebelum blok commit diserahkan ke user | instruksi head, skill dev | T1 langkah 5 butir **File produk** sesudah **Isi commit** (LITE: T8 langkah 5); butir **Hasil di luar repo** (H2) diubah bersamaan | – |
+| G5 | Executor menjalankan `check_process_notes.py --worktree` di Periksa Diri dan menulis ulang baris tambahannya yang ditandai; temuan di wilayah head dibiarkan | brief executor | T2a langkah 5 / T2b langkah 6 | – |
+| Y23 | Alat `check_process_notes.py` terpasang | `handoff/tools/check_process_notes.py` | Salin `scripts/check_process_notes.py`, lalu jalankan `--all --summary` sekali: path ter-track yang bukan file produk masuk `EXCLUDE`, kata domain yang memang isi produk masuk `ALLOW`. Isi lama yang ditandai disampaikan ke user beserta jumlahnya; pembersihannya butuh izin user | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca] [@bila_side_session]`.
 - **Jenis penanda:**
@@ -661,4 +679,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.21 S9    side~hanya dengan bukti baru  @bila_side_session
 3.21 S10   side~SKILL-FEEDBACK  @bila_side_session
 3.21 N22   file:handoff/reports/REPORT_TEMPLATE.md~<N> ERROR
+3.22 G4    head~check_process_notes || dev~check_process_notes
+3.22 G5    executor~check_process_notes
+3.22 Y23   ada~handoff/tools/check_process_notes.py
 ```
