@@ -11,6 +11,7 @@ DOC dan baris INFO dokumen hanya dengan --docs (tanpanya satu baris hitungan, `d
 perubahan kosong memberi baris "No changed files to check" dan `"files": 0`, `"mode"` di setiap --json.
 Argumen: folder skill. Fixture juga bisa diimpor (FALSE_POSITIVES, BASE) tanpa menjalankan uji."""
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -184,6 +185,17 @@ def make_repo(root, change=None, base=None):
     return root
 
 
+def short_path(path):
+    """8.3 short form of path on Windows when the volume has one and it differs, else None."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    buf = ctypes.create_unicode_buffer(1024)
+    if not ctypes.windll.kernel32.GetShortPathNameW(str(path), buf, 1024):
+        return None
+    return buf.value if buf.value and buf.value.lower() != str(path).lower() else None
+
+
 def run(cwd, *args, script=None):
     r = subprocess.run([sys.executable, str(script or SCRIPT), *args], cwd=str(cwd), capture_output=True, text=True,
                        encoding="utf-8")
@@ -286,6 +298,15 @@ def main():
         rc, j6, out = run_json(tp, "src/later.js")
         check("path argument limits the checked files", rc == 0 and j6 is not None
               and {m["name"] for m in j6["marks"]} == {"ghost_later"}, out)
+        rc, j6b, out = run_json(tp / "src", "later.js")
+        check("path argument from a subfolder", rc == 0 and j6b is not None
+              and {m["name"] for m in j6b["marks"]} == {"ghost_later"}, out)
+        short = short_path(tp)
+        if short:
+            # The working folder given as an 8.3 short name, while git reports the long name.
+            rc, j6c, out = run_json(short, "src/later.js")
+            check("path argument with an 8.3 short working folder", rc == 0 and j6c is not None
+                  and {m["name"] for m in j6c["marks"]} == {"ghost_later"}, out)
 
         # 4. exit codes
         nogit = tmp / "nogit"

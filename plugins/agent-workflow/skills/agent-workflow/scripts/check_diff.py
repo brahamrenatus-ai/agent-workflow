@@ -64,6 +64,7 @@ import io
 import json
 import keyword
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -1635,9 +1636,17 @@ def main():
         print("ERROR: not inside a git repository.")
         return 2
     root = r.stdout.decode("utf-8", errors="replace").strip()
+    # Relative paths are joined to git's own prefix for the current folder, not compared with the
+    # toplevel string: on Windows the temp folder can be an 8.3 short name (RUNNER~1) while git
+    # reports the long name, and relpath between the two leaves the repository.
+    prefix = git(os.getcwd(), "rev-parse", "--show-prefix", check=False).stdout.decode(
+        "utf-8", errors="replace").strip()
     paths = []
     for p in a.paths:
-        rel = os.path.relpath(os.path.abspath(p), root).replace("\\", "/")
+        if os.path.isabs(p):
+            rel = os.path.relpath(os.path.realpath(p), os.path.realpath(root)).replace("\\", "/")
+        else:
+            rel = posixpath.normpath(posixpath.join(prefix, p.replace("\\", "/")))
         paths.append(rel)
     mode_name = "commit" if a.commit else "range" if a.range else "staged" if a.staged else "worktree"
     try:
