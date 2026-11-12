@@ -532,6 +532,27 @@ Susunan T1: bagian **Peran** dan **Aturan User** kini berada di atas **Langkah**
 | Y25 | `record.py` melewati log di luar folder project | `handoff/tools/record.py` | Salin ulang `scripts/record.py` | – |
 | I7 | `screenshot.py` mencoba ulang saat browser belum siap | `handoff/tools/screenshot.py` | Salin ulang `scripts/screenshot.py`; tambalan lokal dibawa | – |
 
+## v3.24 (2026-11-12): fakta tentang baris tambahan sebelum diff dibaca
+Alasan: bagian mekanis dari review diff (nama yang tidak didefinisikan di mana pun, impor yang tidak dipakai, pemanggilan lewat kunci string untuk lolos pemeriksaan teks, nama di dokumen yang tidak ada di kode) dikerjakan dengan membaca, sehingga lolos saat diff panjang. Alat `scripts/check_diff.py` melaporkannya sebagai fakta tanpa mengubah file. Tanda bukan vonis: nama bisa anggota pustaka yang tidak dikenal alat, dan dokumen bisa memang menjelaskan kode yang belum ada.
+
+Yang dilaporkan alat (baris tambahan saja; mode `--worktree`, `--staged`, `--commit`, `--range`, `--json`):
+- `UNDEFINED`: nama yang dipakai di baris baru tetapi tidak ada di tempat lain di kode dan tidak didefinisikan di perubahan itu: properti dari data repo, pemanggilan fungsi, `var(--x)` tanpa definisi, nilai satu kata pada komponen, rujukan id (`htmlFor`, `aria-labelledby`), dan path impor relatif yang tidak menuju file.
+- `UNUSED-IMPORT`: nama yang diimpor di baris baru dan tidak dipakai di file itu.
+- `DYNAMIC-CALL`: pemanggilan lewat kunci string, `obj['nama'](...)`.
+- `DOC`: nama di span kode atau blok kode pada baris baru file Markdown yang tidak ada di kode.
+- Komentar, isi string, dan literal regex dibuang sebelum pemakaian dicari. Anggota pustaka (objek buatan global atau paket, pustaka standar JS/DOM/Node) tidak diperiksa. Dokumen yang sebagian besar namanya tidak ada di kode memberi satu baris INFO, bukan satu tanda per nama. Bahasa yang tidak diurai dicantumkan sebagai `not checked`.
+- Lapisan agen dilewati seperti di `check_process_notes.py`, kecuali `handoff/tools/`.
+
+`DOC` hanya ditampilkan dengan `--docs`: dokumen bisa mengusulkan kode atau menjelaskan sistem lain, hal yang tidak terbedakan oleh mesin dari klaim yang salah, jadi ia bahan head, bukan kewajiban executor. Tanpa `--docs`, satu baris `DOC: N names ... (run with --docs to list them)` memberi jumlahnya dan tidak masuk hitungan akhir. Bila tidak ada file berubah di mode yang dipilih, alat mencetak baris eksplisit (gunakan `--commit` atau `--range` bila perubahan sudah di-commit), dan `--json` memuat `mode`, `files`, dan `docs_hidden`.
+
+Executor menjalankannya tanpa `--docs` di Periksa Diri: executor HIGH dan MEDIUM memperbaiki tiap tanda atau menjelaskannya, executor berkapasitas rendah menyalin baris tanda ke bagian Masalah tanpa memperbaiki. Head menjalankannya dengan `--docs` sebelum membaca diff dan mengecek tiap tanda di kodenya: penjelasan di report hanya klaim, dan tanda tanpa penjelasan adalah temuan. Butir **Review dua tahap** kini merujuk alat itu untuk bagian mekanisnya, dan head membaca sendiri sisanya (kode mati, komentar demi test statis, test yang dilonggarkan). Skill dev LITE menjalankannya dengan `--staged --docs` sebelum commit.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| G7 | Executor menjalankan `check_diff.py` (tanpa `--docs`) di Periksa Diri: HIGH/MEDIUM memperbaiki tiap tanda atau menulisnya di Anomali beserta alasan, kapasitas rendah menyalin baris tanda ke Masalah tanpa memperbaiki; tanda di wilayah head dibiarkan. Skill dev LITE menjalankan `check_diff.py --staged --docs` sebelum commit | brief executor, skill dev | T2a langkah 5 / T2b langkah 6 (LITE: T8 langkah 5) | – |
+| M8 | Review dua tahap mulai dari `check_diff.py --docs`: tiap tanda dicek di kodenya, penjelasan di report adalah klaim, tanda tanpa penjelasan adalah temuan; sisanya dibaca sendiri | instruksi head | T1 langkah 2 butir **Review dua tahap**, menggantikan daftar pola mekanis; tag M7 tetap | – |
+| Y26 | Alat `check_diff.py` terpasang | `handoff/tools/check_diff.py` | Salin `scripts/check_diff.py` ke `handoff/tools/` | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca] [@bila_side_session]`.
 - **Jenis penanda:**
@@ -716,4 +737,7 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.23 Y24   ada~handoff/tools/brief.py
 3.23 Y25   file:handoff/tools/record.py~def di_luar_project
 3.23 I7    file:handoff/tools/screenshot.py~--startup-timeout  @bila_ui
+3.24 G7    executor~check_diff || dev~check_diff
+3.24 M8    head~check_diff
+3.24 Y26   ada~handoff/tools/check_diff.py
 ```

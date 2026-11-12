@@ -134,8 +134,8 @@ def buat(root, lama, keluaran_lama=False):
     (root / "web/index.html").write_text("<!doctype html><title>demo</title>\n", encoding="utf-8")
     (root / "handoff/tools").mkdir(parents=True, exist_ok=True)
     for s in ("record.py", "check_evidence.py", "check_secrets.py", "screenshot.py", "orca_wait.py", "context_size.py", "head_restart.py",
-              "check_process_notes.py", "brief.py"):
-        if (SKILL / "scripts" / s).is_file():  # check_process_notes.py sejak v3.22
+              "check_process_notes.py", "brief.py", "check_diff.py"):
+        if (SKILL / "scripts" / s).is_file():  # check_process_notes.py sejak v3.22, check_diff.py sejak v3.24
             shutil.copy(SKILL / "scripts" / s, root / "handoff/tools" / s)
     if lama:  # salinan check_evidence.py sebelum v3.20 belum mengenal status NONE
         p = root / "handoff/tools/check_evidence.py"
