@@ -109,6 +109,22 @@ try:
     cek(r.returncode == 0 and "Heartbeat di-ack: 0." in out and "- tidak ada heartbeat selama menunggu" in out,
         "TIMEOUT tanpa heartbeat menyebut tidak ada heartbeat", out)
 
+    # 2b. Baris untuk batch tanpa deliveryId (v3.24.1).
+    d1 = pesan("worker_done", 10, "TASK-010 DONE", "satu", {"taskId": "task_uji", "dispatchId": "ctx_d", "outcome": "succeeded"})
+    r, out, pg = jalankan(tmp, [{"keluar": hasil([d1], None)}])
+    cek(r.returncode == 0 and "Tanpa deliveryId: tidak ada yang perlu di-ack; pesan ini tidak muncul lagi di check. Isi utuh: orca orchestration inbox --full --json" in out
+        and "Ack sesudah diproses" not in out, "D1: batch tanpa deliveryId mencetak satu baris penjelas dan tanpa perintah ack", out)
+    r, out, pg = jalankan(tmp, [{"keluar": hasil([d1], "dlv_1")}])
+    cek("Ack sesudah diproses: orca orchestration check --ack dlv_1 --json" in out and "Tanpa deliveryId:" not in out,
+        "D2: batch dengan deliveryId mencetak perintah ack dan tanpa baris penjelas", out)
+    r, out, pg = jalankan(tmp, [{"keluar": hasil([hb(8, "ctx_d", "testing")], "delivery_hb3")},
+                                {"keluar": hasil([], None), "tidur": 0.3}], "--minutes", "0.02")
+    cek(r.returncode == 0 and out.startswith("TIMEOUT") and "Tanpa deliveryId:" not in out,
+        "D3: hanya heartbeat sampai batas waktu tidak mencetak baris penjelas", out)
+    d2 = pesan("worker_done", 11, "TASK-011 DONE", "dua", {"taskId": "task_uji", "dispatchId": "ctx_e", "outcome": "succeeded"})
+    r, out, pg = jalankan(tmp, [{"keluar": hasil([d1, d2], None)}])
+    cek(out.count("Tanpa deliveryId:") == 1, "D4: batch tanpa deliveryId berisi dua worker_done mencetak baris penjelas tepat satu kali", out)
+
     # 3. Batch campuran: tidak di-ack, heartbeat di dalamnya hanya dihitung.
     q = pesan("question", 6, "Pakai opsi mana?", "opsi 1 atau 2")
     r, out, pg = jalankan(tmp, [{"keluar": hasil([hb(5, "ctx_a", "implementing"), q], "delivery_q")}])

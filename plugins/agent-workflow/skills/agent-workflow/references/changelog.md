@@ -553,6 +553,22 @@ Executor menjalankannya tanpa `--docs` di Periksa Diri: executor HIGH dan MEDIUM
 | M8 | Review dua tahap mulai dari `check_diff.py --docs`: tiap tanda dicek di kodenya, penjelasan di report adalah klaim, tanda tanpa penjelasan adalah temuan; sisanya dibaca sendiri | instruksi head | T1 langkah 2 butir **Review dua tahap**, menggantikan daftar pola mekanis; tag M7 tetap | – |
 | Y26 | Alat `check_diff.py` terpasang | `handoff/tools/check_diff.py` | Salin `scripts/check_diff.py` ke `handoff/tools/` | – |
 
+## v3.24.1 (2026-11-14): log gagal yang tidak disebut report, hitung() atas semua file teks
+Alasan: `check_evidence.py` hanya memeriksa log yang dirujuk report, jadi run gagal yang dicatat `record.py` untuk task itu tetapi tidak disebut report tidak pernah terlihat. Cakupan folder `hitung()` dan rujukan `file:baris` terbatas pada daftar ekstensi, sehingga file `.jsx`, `.tsx`, `.css`, `.go`, atau file tanpa ekstensi dilewati tanpa pesan: baris NONE lolos padahal ada pemakai, dan rujukan yang sah ditolak dengan pesan "tanpa rujukan".
+
+- `check_evidence.py`: WARNING untuk log gagal milik task report (`TASK-<nomor>-*` di `handoff/logs/` untuk `REPORT-<nomor>.md`, pola nomor sama dengan `record.py`) yang run-nya di log sekarang keluar dengan kode bukan 0 dan namanya tidak disebut di baris report mana pun selain keluaran `git status`. Report BLOCKED, log yang run gagalnya sudah ditimpa run hijau (tanpa `--append`), dan catatan file `--result` dilewati. Untuk `grep`, `rg`, dan `git grep` berkode 1, pesannya menyebut bahwa kode itu berarti tidak ada kecocokan. WARNING, bukan ERROR: run yang dicatat sesudah report ditulis tidak terbedakan di mode working tree.
+- `check_evidence.py`: `hitung(<folder>, ..)` membaca file berekstensi lama seperti dulu, ditambah file lain yang ekstensinya tidak termasuk daftar biner dan 8.192 byte pertamanya tanpa byte NUL. Hitungan atas report lama hanya bisa naik.
+- `check_evidence.py`: rujukan `file:baris` mengenali ekstensi tambahan (`jsx tsx mjs cjs mts cts css scss sass less vue svelte astro htm xml mdx java kt kts swift go rs rb php cs dart lua scala cc cxx hh hxx asm cmake mk gradle properties conf bat cmd psm1 rst proto graphql tf prisma`).
+- `orca_wait.py`: batch tanpa `deliveryId` diakhiri satu baris yang menyatakan tidak ada yang perlu di-ack dan menunjuk `orca orchestration inbox --full --json` untuk isi utuh.
+- Bukti model worker Orca dibaca dari `orca orchestration worker-show --dispatch <id> --full --json` (`result.worker.startOptions.launch.effective`). Dicek pada Orca 1.4.253: receipt `worker-start --json` memuat `agent` dan `model` tanpa `launch`, dan `worker-show` tanpa `--full` tidak memuat `launch`.
+
+| ID | Perubahan | File sasaran | Cara patch | Persetujuan |
+|---|---|---|---|---|
+| Y27 | `check_evidence.py` versi ini: log gagal yang tidak disebut report, `hitung(<folder>)` atas semua file teks, ekstensi rujukan tambahan | `handoff/tools/check_evidence.py` | Salin ulang `scripts/check_evidence.py` | – |
+| M9 | Head membaca peringatan "tidak disebut di report" | instruksi head | T1 langkah 2 butir **Integritas bukti**, satu kalimat sebelum peringatan "path sementara" | – |
+| Y28 | `orca_wait.py` versi ini: baris untuk batch tanpa `deliveryId` | `handoff/tools/orca_wait.py` | Salin ulang `scripts/orca_wait.py` | – |
+| D20 | Bukti model dari `worker-show --full` | instruksi head | T1 butir **Model dari bukti peluncuran** | – |
+
 ## Penanda
 Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_ui] [@bila_orca] [@bila_side_session]`.
 - **Jenis penanda:**
@@ -740,4 +756,8 @@ Format tiap baris: `versi  ID  penanda [|| penanda lain]  [@bila_secret] [@bila_
 3.24 G7    executor~check_diff || dev~check_diff
 3.24 M8    head~check_diff
 3.24 Y26   ada~handoff/tools/check_diff.py
+3.24.1 Y27 file:handoff/tools/check_evidence.py~def cek_log_tak_disebut
+3.24.1 M9  head~tidak disebut di report
+3.24.1 Y28 file:handoff/tools/orca_wait.py~tidak ada yang perlu di-ack  @bila_orca
+3.24.1 D20 head~worker.startOptions.launch.effective  @bila_orca
 ```

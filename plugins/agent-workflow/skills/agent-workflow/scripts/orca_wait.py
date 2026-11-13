@@ -126,6 +126,8 @@ def cetak_pesan(hasil, n_hb):
             print(f"  payload: {m['payload']}")
     if d:
         print(f"Ack sesudah diproses: orca orchestration check --ack {d} --json")
+    else:
+        print("Tanpa deliveryId: tidak ada yang perlu di-ack; pesan ini tidak muncul lagi di check. Isi utuh: orca orchestration inbox --full --json")
 
 
 def cetak_timeout(menit, hb, n_hb):

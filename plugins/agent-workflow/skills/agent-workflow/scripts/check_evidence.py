@@ -23,7 +23,7 @@ Yang dicek:
      dinilai otomatis; status OK yang bertentangan dengan hasilnya adalah masalah;
    - tabel task FACT (kolom Pertanyaan, Jawaban, Bukti, Status): FOUND butuh `file:baris` atau `hitung`,
      NONE butuh `hitung(lingkup, "pola")` yang hasilnya 0, UNSURE tidak dicek. Lingkup `hitung` boleh
-     satu file, sebuah folder (semua file teks di dalamnya), atau pola glob seperti `src/**/*.cpp`.
+     satu file, sebuah folder (semua file teks di dalamnya, juga tanpa ekstensi atau berekstensi di luar daftar rujukan), atau pola glob seperti `src/**/*.cpp`.
    - status ditulis OK, FAIL, atau UNTESTED (task FACT: FOUND, NONE, UNSURE). Bentuk lain juga diterima: PASS,
      NOT TESTED, NOT FOUND, dan nama sebelum v3.20 (padanannya di references/changelog.md skill, bagian v3.20).
 3. Di blok kode lain: baris berformat log (diawali `[HH:MM:SS]` atau `[TAG]`), output `grep -n` atau
@@ -56,6 +56,9 @@ yang sebenarnya memenuhi Harapan, report (selain BLOCKED) tanpa bagian Periksa D
 bernomor K, angka bersatuan (mis. `3-6 detik`, `7,20:1`, `45%`) di Ringkasan Fakta, Keputusan Implementasi,
 atau Anomali tanpa rujukan `file:baris` di baris yang sama dan tanpa tanda perkiraan/HYPOTHESIS, dan log yang
 dirujuk report tetapi ditimpa dengan perintah lain (menurut provenance.jsonl; `--append` tidak dihitung).
+Peringatan dari provenance.jsonl (v3.24.1): log gagal milik task report ini (`TASK-<nomor>-*` untuk `REPORT-<nomor>.md`;
+run yang isinya masih ada di log keluar dengan kode bukan 0) yang namanya tidak disebut di report, kecuali di baris
+keluaran `git status`. Report BLOCKED dan catatan file hasil `--result` dilewati.
 Tiga peringatan lain juga dari provenance.jsonl (v3.18):
 - baris OK yang merujuk log dengan kode keluar bukan 0, kecuali baris itu menyebut kode keluarnya (`exit 1`,
   `kode_keluar=1`) atau menandainya uji merah;
@@ -92,7 +95,20 @@ import subprocess
 import sys
 from pathlib import Path
 
-EKSTENSI = "log|txt|md|csv|tsv|json|jsonl|yaml|yml|ini|toml|cfg|out|py|ps1|sh|c|h|cpp|hpp|ino|js|ts|html|sql"
+# Daftar v3.24, dibekukan: hitung(<folder>) selalu membaca file berekstensi ini (butir B v3.24.1).
+EKSTENSI_HITUNG_LAMA = set("log|txt|md|csv|tsv|json|jsonl|yaml|yml|ini|toml|cfg|out|py|ps1|sh|c|h|cpp|hpp|ino|js|ts|html|sql".split("|"))
+# Ekstensi yang dikenali sebagai rujukan `file:baris`; alternatif terpanjang dulu supaya `jsx` tidak terpotong menjadi `js`.
+EKSTENSI = "|".join(sorted(EKSTENSI_HITUNG_LAMA | set(
+    "jsx tsx mjs cjs mts cts css scss sass less vue svelte astro htm xml mdx java kt kts swift go rs rb php cs dart lua scala "
+    "cc cxx hh hxx asm cmake mk gradle properties conf bat cmd psm1 rst proto graphql tf prisma".split()), key=lambda e: (-len(e), e)))
+# Ekstensi biner: hitung(<folder>) tidak membukanya (file besar); file lain dibaca bila 8.192 byte pertamanya tanpa byte NUL.
+BINER = set("png jpg jpeg gif webp bmp ico pdf zip gz tgz bz2 xz 7z rar tar jar war class exe dll so dylib o a lib bin elf uf2 img "
+            "iso woff woff2 ttf otf eot mp3 mp4 m4a wav ogg flac avi mov mkv webm pyc pyo db sqlite sqlite3 xlsx xls docx doc "
+            "pptx ppt psd skp glb".split())
+CONTOH_NUL = 8192
+# Nomor task di nama log: pola yang sama dengan status_task di record.py.
+NOMOR_TASK = re.compile(r"TASK-(\d+[A-Za-z]?)(?=[-_.]|$)", re.I)
+NOMOR_REPORT = re.compile(r"REPORT-(\d+[A-Za-z]?)\.md", re.I)
 FILE = rf"(?:[A-Za-z]:[/\\])?(?:[\w.-]+[/\\])*[\w.-]+\.(?:{EKSTENSI})"
 REF = re.compile(rf"(?<![\w/.\\-])({FILE}):(\d+(?:\s*,\s*\d+)*)(?![\d:])", re.I)
 REF_LANJUT = re.compile(rf"(?<![\w/.\\-])({FILE}):(\d+(?:\s*,\s*\d+)*)(?![\d:])|(?<![\w/.\\-]):(\d+)(?![\d:])", re.I)
@@ -109,7 +125,6 @@ TOKEN = re.compile(r"([A-Za-z_][\w.]*)\s*=\s*([^\s,;|`]+)")
 SYARAT = re.compile(r"^([A-Za-z_][\w.]*)?\s*(==|=|!=|<=|>=|<|>|≤|≥)\s*(-?\d+(?:[.,]\d+)?|\S+)\s*([A-Za-z%]*)$")
 ANGKA = re.compile(r"-?\d+(?:[.,]\d+)?")
 LOG_EXT = (".log", ".txt", ".csv", ".tsv", ".out", ".json", ".jsonl")  # baris kode boleh berubah sesudah dikutip
-EKSTENSI_SET = set(EKSTENSI.split("|"))
 ABAIKAN = {".git", ".pio", "node_modules", ".venv", "venv", "__pycache__", "build", "dist"}
 ASAL = Path("handoff") / "logs" / "provenance.jsonl"
 ASAL_LAMA = Path("handoff") / "logs" / "asal.jsonl"  # nama sebelum v3.12
@@ -294,6 +309,44 @@ def cek_asal(dirujuk, berkas, asal, wajib, hasil):
         if sementara:
             hasil.peringatan(0, f"log {rel} dibuat perintah yang memakai path sementara: `{sementara.get('perintah')}`; "
                                 "skrip di sana tidak bisa diperiksa ulang. Simpan alatnya di repo, atau jalankan perintah di task")
+
+
+def perintah_grep(perintah):
+    """Perintah pencarian yang kode 1-nya berarti tidak ada kecocokan: token pertama (nama dasar, tanpa .exe, tanpa
+    peka huruf) grep, egrep, fgrep, atau rg; atau dua token pertama `git grep`."""
+    token = str(perintah or "").split()
+    if not token:
+        return False
+    nama = token[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if nama.endswith(".exe"):
+        nama = nama[:-4]
+    return nama in ("grep", "egrep", "fgrep", "rg") or (nama == "git" and len(token) > 1 and token[1].lower() == "grep")
+
+
+def cek_log_tak_disebut(path_report, baris, asal, hasil):
+    """Log gagal milik task report ini (`TASK-<nomor>-*` di handoff/logs/) yang tidak disebut report (v3.24.1).
+    Gagal = ada catatan gagal di run yang isinya masih ada di log (pisah_run), kecuali catatan `hasil` (file --result);
+    disebut = nama file log muncul di baris report mana pun yang bukan keluaran `git status`. Satu peringatan per log."""
+    m = NOMOR_REPORT.fullmatch(path_report.name)
+    if asal is None or not m:
+        return
+    nomor = m.group(1).lower()
+    teks = [b.lower() for b in baris if not STATUS_GIT.match(b)]
+    for kunci in sorted(asal):
+        riwayat = asal[kunci]
+        rel = str(riwayat[-1].get("file", kunci)).replace("\\", "/")
+        nama = rel.rsplit("/", 1)[-1]
+        mt = NOMOR_TASK.match(nama)
+        if not rel.lower().startswith("handoff/logs/") or not mt or mt.group(1).lower() != nomor:
+            continue
+        gagal = [r for r in pisah_run(riwayat)[1] if kode_gagal(r) and r.get("jenis") != "hasil"]
+        if not gagal or any(nama.lower() in b for b in teks):
+            continue
+        ket = ("; pada grep/rg kode 1 berarti tidak ada kecocokan"
+               if gagal[-1].get("kode_keluar") == 1 and perintah_grep(gagal[-1].get("perintah")) else "")
+        hasil.peringatan(0, f"log {rel} keluar dengan kode {gagal[-1].get('kode_keluar')} (provenance; perintah: "
+                            f"{str(gagal[-1].get('perintah', '?'))[:120]}{ket}) dan tidak disebut di report; sebut log itu dan "
+                            "penyebabnya (mis. di Anomali), atau ubah status kriteria yang bergantung padanya")
 
 
 def cek_kriteria(path_report, data, berkas, hasil):
@@ -557,6 +610,29 @@ class Berkas:
             self._bersama = ([p for p in semua if p not in abaikan], len(abaikan))
         return self._bersama
 
+    def teks_hitung(self, p):
+        """True bila file di folder ikut dihitung hitung(): ekstensi lama, atau bukan ekstensi biner dan tanpa byte NUL di
+        8.192 byte pertama. File yang gagal dibaca dilewati; isi yang ternyata biner tidak disimpan di cache (mode --at)."""
+        e = p.suffix.lower().lstrip(".")
+        if e in EKSTENSI_HITUNG_LAMA:
+            return True
+        if e in BINER:
+            return False
+        try:
+            if p in self._mentah:
+                awal = self._mentah[p][:CONTOH_NUL]
+            elif self.rev is None:
+                with open(p, "rb") as f:
+                    awal = f.read(CONTOH_NUL)
+            else:
+                isi = self.git("show", f"{self.rev}:{self.rel(p)}").stdout
+                awal = isi[:CONTOH_NUL]
+                if b"\0" not in awal:
+                    self._mentah[p] = isi
+        except OSError:
+            return False
+        return b"\0" not in awal
+
     def daftar_file(self, nama):
         """File untuk hitung(): satu file, semua file teks di sebuah folder, atau pola glob. ([path], None) atau ([], pesan)."""
         nama = nama.strip().replace("\\", "/")
@@ -576,7 +652,7 @@ class Berkas:
         p = Path(nama) if Path(nama).is_absolute() else self.root / nama
         isi = self.isi_folder(p)
         if isi:
-            cocok = sorted(q for q in isi if boleh(q) and q.suffix.lower().lstrip(".") in EKSTENSI_SET)
+            cocok = sorted(q for q in isi if boleh(q) and self.teks_hitung(q))
             return (cocok, None) if cocok else ([], f"folder {nama} tidak berisi file teks")
         path, galat = self.cari(nama)
         return ([path], None) if path else ([], galat)
@@ -1021,6 +1097,7 @@ def periksa(path_report, berkas, asal=None, wajib_asal=False):
     bukti_log = file_dirujuk("\n".join(b for b in baris if not STATUS_GIT.match(b)), berkas, path_report)
     cek_asal(bukti_log, berkas, asal, wajib_asal, hasil)
     if not blocked:
+        cek_log_tak_disebut(path_report, baris, asal, hasil)
         cek_kriteria(path_report, data, berkas, hasil)
     if hasil.dicek == 0 and not ada_tabel and not blocked:
         hasil.masalah(0, "tidak ada bukti yang bisa dicek (blok bukti, tabel Bukti/Status, atau baris log dari file)")

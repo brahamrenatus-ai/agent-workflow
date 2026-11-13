@@ -42,7 +42,7 @@ Untuk Antigravity, hanya `Full access` yang mengubah perilakunya. Dengan setelan
 2. Setelan izin agen dicek bersama user, lalu dicatat di Profil Executor (penanda D6) dan register keputusan.
 3. **Dispatch baca-saja**, satu untuk setiap agen yang akan dipakai, ditunggu dengan `handoff/tools/orca_wait.py` (salin dulu `scripts/orca_wait.py` milik skill ini). Spec-nya menjalankan `check_evidence.py` atas report terakhir dan `git status --porcelain`, tanpa mengubah file apa pun. Sesudah worker selesai:
    - isi `worker_done` cocok dengan hasil yang didapat head saat menjalankan ulang perintah yang sama;
-   - `launch.effective` di receipt sama dengan yang diminta;
+   - `result.worker.startOptions.launch.effective` dari `orca orchestration worker-show --dispatch <id> --full --json` sama dengan yang diminta (receipt `worker-start` tidak memuatnya);
    - mode izin terlihat di terminal worker (Claude Code menampilkannya di baris status), termasuk apakah agen meminta konfirmasi untuk perintah biasa;
    - worker dilepas dengan `orca orchestration worker-release --dispatch <id> --json`.
 4. Bila ada yang tidak sesuai, catat bentuk yang jalan, sesuai aturan perintah dicek jalan (Pelajaran 24).

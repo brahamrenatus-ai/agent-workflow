@@ -559,5 +559,594 @@ try:
         print("SKIP  uji v3.18.1: check_evidence.py versi lama")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
+
+# ---- v3.24.1: A log gagal yang tidak disebut report, B hitung(<folder>) membaca semua file teks, C ekstensi rujukan ----
+import hashlib
+import json
+
+tmp2 = Path(tempfile.mkdtemp(prefix="cekbukti2_"))
+KASUS = []
+GIT = ["git", "-c", "user.name=uji", "-c", "user.email=uji@example.com", "-c", "core.autocrlf=false"]
+MARKA = "tidak disebut di report"  # penanda peringatan A
+OK_LOG = "[10:00:00] lulus=3/3\n"
+GAGAL_LOG = "[10:00:01] FAIL WidgetAlpha\n"
+PERIKSA_T = "\n## Periksa Diri\n- ok\n"
+PAT = "WidgetAlpha"
+TABEL_FAKTA = "| No | Pertanyaan | Jawaban | Bukti | Status |\n|---|---|---|---|---|\n"
+L15 = "".join(f"L{i}\n" for i in range(1, 16))
+
+
+def kasus(id_):
+    def pasang(fn):
+        KASUS.append((id_, fn))
+        return fn
+    return pasang
+
+
+def proyek(nama, git=False):
+    p = tmp2 / nama
+    for d in ("handoff/reports", "handoff/logs"):
+        (p / d).mkdir(parents=True)
+    if git:
+        subprocess.run(["git", "init", "-q"], cwd=p, capture_output=True)
+    return p
+
+
+def tulis(p, rel, isi):
+    f = p / rel
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(isi if isinstance(isi, bytes) else isi.encode("utf-8"))
+
+
+def git(p, *args):
+    subprocess.run(GIT + list(args), cwd=p, capture_output=True)
+
+
+def rec(nama, isi, perintah, kode, **kw):
+    r = {"file": f"handoff/logs/{nama}", "jenis": "log", "perintah": perintah, "kode_keluar": kode,
+         "mulai": "2026-11-13T10:00:00", "selesai": "2026-11-13T10:00:01", "tambah": False,
+         "sha256": hashlib.sha256(isi.encode("utf-8")).hexdigest()}
+    r.update(kw)
+    return r
+
+
+def prov(p, recs, mode="w"):
+    with open(p / "handoff/logs/provenance.jsonl", mode, encoding="utf-8", newline="\n") as f:
+        for r in recs:
+            f.write(json.dumps(r) + "\n")
+
+
+def a_proyek(nama, *baru, ok="TASK-001-ok.log", git_=False, tanpa_prov=False):
+    """Proyek dengan log hijau `ok` dan log lain; tiap `baru` = (nama log, isi, perintah, kode[, tambahan catatan])."""
+    p = proyek(nama, git_)
+    tulis(p, f"handoff/logs/{ok}", OK_LOG)
+    recs = [rec(ok, OK_LOG, "node --test a.js", 0)]
+    for n, isi, perintah, kode, *ex in baru:
+        tulis(p, f"handoff/logs/{n}", isi)
+        recs.append(rec(n, isi, perintah, kode, **(ex[0] if ex else {})))
+    if not tanpa_prov:
+        prov(p, recs)
+    return p
+
+
+def laporan(nomor="001", ok="TASK-001-ok.log", ekstra="", blocked=False):
+    return (f"# REPORT-{nomor}\n## Data yang Diminta\n" + TABEL
+            + f"| K1 | lulus=3/3 | lulus=3/3 | handoff/logs/{ok}:1 | OK |\n\n" + ekstra
+            + ("\nStatus akhir: BLOCKED\n" if blocked else "") + PERIKSA_T)
+
+
+def lari(p, nama, isi, *args):
+    f = p / "handoff" / "reports" / nama
+    f.write_bytes(isi.encode("utf-8"))
+    r = subprocess.run([sys.executable, "-B", str(SKRIP), *args, str(f.relative_to(p))], cwd=p,
+                       capture_output=True, text=True, encoding="utf-8")
+    return r.returncode, r.stdout + r.stderr
+
+
+def pa(out):
+    return [l for l in out.splitlines() if MARKA in l]
+
+
+def n_cocok(out, lingkup="src"):
+    m = re.search(rf"padahal (\d+) baris di {lingkup} cocok", out)
+    return int(m.group(1)) if m else 0
+
+
+def r_none(bukti='hitung(src, "WidgetAlpha")'):
+    return ("# REPORT-001\n## Data yang Diminta\n" + TABEL_FAKTA
+            + f"| 1 | Ada pemakai WidgetAlpha di src? | tidak ada | {bukti} | NONE |\n" + PERIKSA_T)
+
+
+def b_proyek(nama, git_=False):
+    p = proyek(nama, git_)
+    tulis(p, "src/main.js", "export const a = 1;\n")
+    for f in ("App.jsx", "Panel.tsx", "audit.mjs", "Detail.css", "Makefile"):
+        tulis(p, f"src/{f}", f"// {PAT}\n")
+    return p
+
+
+# ---- A ----
+@kasus("A1")
+def test_a1_failed_log_not_mentioned():
+    p = a_proyek("a1", ("TASK-001-fail.log", GAGAL_LOG, "node --test b.js", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(rc == 0 and "0 ERROR" in out and len(w) == 1 and "handoff/logs/TASK-001-fail.log" in w[0]
+        and "kode 1" in w[0] and "node --test b.js" in w[0],
+        "A1 log gagal yang tidak disebut report: 1 peringatan dengan path, kode, perintah; 0 ERROR; exit 0", out)
+
+
+@kasus("A2")
+def test_a2_only_in_porcelain_line():
+    p = a_proyek("a2", ("TASK-001-fail.log", GAGAL_LOG, "node --test b.js", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan(ekstra="```\n?? handoff/logs/TASK-001-fail.log\n```\n"))
+    cek(len(pa(out)) == 1, "A2 nama log hanya di baris git status: tetap 1 peringatan", out)
+
+
+@kasus("A3")
+def test_a3_mentioned_in_prose():
+    p = a_proyek("a3", ("TASK-001-fail.log", GAGAL_LOG, "node --test b.js", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan(ekstra="## Anomali\nRun TASK-001-fail.log keluar 1 karena WidgetAlpha.\n"))
+    cek(rc == 0 and not pa(out), "A3 log disebut di prosa Anomali: 0 peringatan", out)
+
+
+@kasus("A4")
+def test_a4_referenced_by_ok_row():
+    p = a_proyek("a4", ("TASK-001-fail.log", OK_LOG, "node --test b.js", 1))
+    isi = laporan().replace("\n\n", "\n| K2 | lulus=3/3 | lulus=3/3 | handoff/logs/TASK-001-fail.log:1 | OK |\n\n", 1)
+    rc, out = lari(p, "REPORT-001.md", isi)
+    cek(out.count("status OK merujuk") == 1 and not pa(out), "A4 log gagal dirujuk baris OK: peringatan lama 1, peringatan A 0", out)
+
+
+@kasus("A5")
+def test_a5_overwritten_green():
+    p = a_proyek("a5", ("TASK-001-x.log", GAGAL_LOG, "c1", 1), ("TASK-001-x.log", OK_LOG, "c2", 0))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(not pa(out), "A5 run gagal tertimpa run hijau: 0 peringatan", out)
+
+
+@kasus("A6")
+def test_a6_append_after_green():
+    p = a_proyek("a6", ("TASK-001-x.log", OK_LOG, "c1", 0), ("TASK-001-x.log", GAGAL_LOG, "c2", 1, {"tambah": True}))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(len(pa(out)) == 1, "A6 run hijau lalu --append gagal: 1 peringatan", out)
+
+
+@kasus("A7")
+def test_a7_other_task_numbers():
+    p = a_proyek("a7", ("TASK-002-fail.log", GAGAL_LOG, "c", 1), ("TASK-0011-fail.log", GAGAL_LOG, "c", 1),
+                 ("TASK-001a-fail.log", GAGAL_LOG, "c", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(not pa(out), "A7 log task lain (002, 0011, 001a) untuk REPORT-001: 0 peringatan", out)
+
+
+@kasus("A7b")
+def test_a7b_letter_suffix():
+    p = a_proyek("a7b", ("TASK-001a-fail.log", GAGAL_LOG, "c", 1), ("TASK-001-fail.log", GAGAL_LOG, "c", 1),
+                 ok="TASK-001a-ok.log")
+    rc, out = lari(p, "REPORT-001a.md", laporan("001a", "TASK-001a-ok.log"))
+    w = pa(out)
+    cek(len(w) == 1 and "TASK-001a-fail.log" in w[0], "A7b REPORT-001a: tepat 1 peringatan, untuk TASK-001a-fail.log", out)
+
+
+@kasus("A8")
+def test_a8_log_without_task_prefix():
+    p = a_proyek("a8", ("build.log", GAGAL_LOG, "make", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(not pa(out), "A8 log gagal tanpa awalan task: 0 peringatan", out)
+
+
+@kasus("A9")
+def test_a9_result_file_record():
+    p = a_proyek("a9", ("TASK-001-out.csv", "a,b\n", "node run.js --result out.csv", 1, {"jenis": "hasil"}))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(not pa(out), "A9 catatan jenis hasil berkode 1: 0 peringatan", out)
+
+
+@kasus("A10")
+def test_a10_blocked_report():
+    p = a_proyek("a10", ("TASK-001-fail.log", GAGAL_LOG, "c", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan(blocked=True))
+    cek(not pa(out), "A10 report BLOCKED: 0 peringatan", out)
+
+
+@kasus("A11")
+def test_a11_log_file_deleted():
+    p = a_proyek("a11", ("TASK-001-fail.log", GAGAL_LOG, "c", 1))
+    (p / "handoff/logs/TASK-001-fail.log").unlink()
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(len(pa(out)) == 1, "A11 file log sudah dihapus, catatan masih ada: 1 peringatan", out)
+
+
+@kasus("A12")
+def test_a12_no_provenance():
+    p = a_proyek("a12", ("TASK-001-fail.log", GAGAL_LOG, "c", 1), tanpa_prov=True)
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(rc == 0 and not pa(out) and "Traceback" not in out, "A12 tanpa file provenance: 0 peringatan, tanpa galat", out)
+
+
+@kasus("A13")
+def test_a13_exit_code_null():
+    p = a_proyek("a13", ("TASK-001-fail.log", GAGAL_LOG, "c", None))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(not pa(out), "A13 kode_keluar null: 0 peringatan", out)
+
+
+@kasus("A14")
+def test_a14_redact_after_failed_run():
+    p = a_proyek("a14", ("TASK-001-fail.log", GAGAL_LOG, "c", 1), ("TASK-001-fail.log", GAGAL_LOG, "redact", 0, {"jenis": "redact"}))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 1 and "kode 1" in w[0], "A14 run gagal diikuti catatan redact: 1 peringatan, kode 1", out)
+
+
+@kasus("A15")
+def test_a15_case_insensitive_mention():
+    p = a_proyek("a15", ("TASK-001-FAIL.log", GAGAL_LOG, "c", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan(ekstra="## Anomali\nRun task-001-fail.log keluar 1 karena WidgetAlpha.\n"))
+    cek(not pa(out), "A15 nama log berbeda huruf besar-kecil di report: dianggap disebut", out)
+
+
+@kasus("A16")
+def test_a16_at_report_sees_overwritten_failure():
+    p = a_proyek("a16", ("TASK-001-fail.log", GAGAL_LOG, "node --test b.js", 1), git_=True)
+    tulis(p, "handoff/reports/REPORT-001.md", laporan())
+    git(p, "add", "-A")
+    git(p, "commit", "-q", "-m", "satu")
+    tulis(p, "handoff/logs/TASK-001-fail.log", OK_LOG)
+    prov(p, [rec("TASK-001-fail.log", OK_LOG, "node --test b.js", 0)], "a")
+    git(p, "add", "-A")
+    git(p, "commit", "-q", "-m", "dua")
+    rc1, out1 = lari(p, "REPORT-001.md", laporan(), "--at-report")
+    rc2, out2 = lari(p, "REPORT-001.md", laporan())
+    cek(len(pa(out1)) == 1 and not pa(out2), "A16 --at-report: 1 peringatan (run gagal pada commit report); working tree: 0", out1 + out2)
+
+
+@kasus("A17")
+def test_a17_failed_then_append_green():
+    p = a_proyek("a17", ("TASK-001-x.log", GAGAL_LOG, "c", 1), ("TASK-001-x.log", OK_LOG, "c2", 0, {"tambah": True}))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 1 and "kode 1" in w[0], "A17 run gagal diikuti --append hijau: 1 peringatan, kode 1", out)
+
+
+@kasus("A18")
+def test_a18_multiple_logs_ordered():
+    p = a_proyek("a18", ("TASK-001-a.log", GAGAL_LOG, "ca", 1), ("TASK-001-a.log", GAGAL_LOG, "ca2", 2, {"tambah": True}),
+                 ("TASK-001-b.log", GAGAL_LOG, "cb", 1), ("TASK-002-x.log", GAGAL_LOG, "cx", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 2 and "TASK-001-a.log" in w[0] and "kode 2" in w[0] and "TASK-001-b.log" in w[1],
+        "A18 dua log milik task: 2 peringatan, urut a lalu b, kode 2 untuk a; task lain tidak", out)
+
+
+@kasus("A19")
+def test_a19_name_without_suffix_and_lowercase():
+    p = a_proyek("a19", ("TASK-001.log", GAGAL_LOG, "c", 1), ("task-001-fail.log", GAGAL_LOG, "c", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 2 and any("TASK-001.log" in l for l in w) and any("task-001-fail.log" in l for l in w),
+        "A19 TASK-001.log dan task-001-fail.log: masing-masing 1 peringatan", out)
+
+
+@kasus("A20")
+def test_a20_task_number_compared_as_text():
+    p = a_proyek("a20", ("TASK-1-fail.log", GAGAL_LOG, "c", 1))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    cek(not pa(out), "A20 TASK-1-fail.log bukan milik REPORT-001: 0 peringatan", out)
+
+
+@kasus("A21")
+def test_a21_run_after_report_commit():
+    p = a_proyek("a21", git_=True)
+    tulis(p, "handoff/reports/REPORT-001.md", laporan())
+    git(p, "add", "-A")
+    git(p, "commit", "-q", "-m", "satu")
+    tulis(p, "handoff/logs/TASK-001-probe.log", GAGAL_LOG)
+    prov(p, [rec("TASK-001-probe.log", GAGAL_LOG, "node probe.js", 1)], "a")
+    rc1, out1 = lari(p, "REPORT-001.md", laporan())
+    rc2, out2 = lari(p, "REPORT-001.md", laporan(), "--at-report")
+    cek(len(pa(out1)) == 1 and not pa(out2), "A21 run gagal sesudah commit report: working tree 1 peringatan; --at-report 0", out1 + out2)
+
+
+KET = "tidak ada kecocokan"
+
+
+def a_grep(nama, perintah_list, kode=1):
+    return a_proyek(nama, *[(f"TASK-001-g{i}.log", GAGAL_LOG, c, kode) for i, c in enumerate(perintah_list)])
+
+
+@kasus("A22")
+def test_a22_rg_code1_explained():
+    p = a_grep("a22", ['rg -n "WidgetAlpha" src'])
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(rc == 0 and len(w) == 1 and "kode 1" in w[0] and 'rg -n "WidgetAlpha" src' in w[0] and KET in w[0],
+        "A22 rg kode 1 tidak disebut: 1 peringatan dengan kode, perintah, keterangan; exit 0", out)
+
+
+@kasus("A23")
+def test_a23_rg_code2_plain():
+    p = a_grep("a23", ['rg -n "WidgetAlpha" src'], kode=2)
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 1 and "kode 2" in w[0] and KET not in w[0], "A23 rg kode 2: 1 peringatan tanpa keterangan", out)
+
+
+@kasus("A24")
+def test_a24_grep_family_code1():
+    p = a_grep("a24", ["grep -rn WidgetAlpha src", "git grep -n WidgetAlpha", "C:/tools/rg.exe -n WidgetAlpha src"])
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 3 and all(KET in l for l in w), "A24 grep, git grep, rg.exe kode 1: 3 peringatan, semuanya dengan keterangan", out)
+
+
+@kasus("A25")
+def test_a25_not_grep_code1():
+    p = a_grep("a25", ["python -m pytest -k grep", "python tools/rg_check.py", "npm run grep"])
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 3 and not any(KET in l for l in w), "A25 perintah bukan grep/rg kode 1: 3 peringatan tanpa keterangan", out)
+
+
+@kasus("A26")
+def test_a26_last_failure_decides():
+    p = a_proyek("a26", ("TASK-001-x.log", GAGAL_LOG, 'rg -n "WidgetAlpha" src', 1),
+                 ("TASK-001-x.log", GAGAL_LOG, "python -m pytest", 1, {"tambah": True}))
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 1 and "python -m pytest" in w[0] and KET not in w[0],
+        "A26 catatan gagal terakhir bukan grep: 1 peringatan tanpa keterangan", out)
+
+
+@kasus("A27")
+def test_a27_long_command_truncated_keeps_note():
+    pola = "W" * 150
+    p = a_grep("a27", [f'rg -n "{pola}" src'])
+    rc, out = lari(p, "REPORT-001.md", laporan())
+    w = pa(out)
+    cek(len(w) == 1 and "W" * 113 in w[0] and "W" * 114 not in w[0] and KET in w[0],
+        "A27 perintah rg 150 karakter: terpotong 120, keterangan tetap ada", out)
+
+
+# ---- B ----
+@kasus("B1")
+def test_b1_none_with_jsx_users():
+    p = b_proyek("b1")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(rc == 1 and "status NONE, padahal 5 baris di src cocok" in out, "B1 NONE dengan pemakai di .jsx/.tsx/.mjs/.css/Makefile: ERROR 5 baris", out)
+
+
+@kasus("B2")
+def test_b2_binary_files_skipped():
+    p = b_proyek("b2")
+    tulis(p, "src/logo.png", PAT.encode() + b"\n")
+    tulis(p, "src/blob.dat", PAT.encode() + b"\n\x00\x01")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out) == 5, "B2 logo.png dan blob.dat (byte NUL) tidak dihitung: tetap 5", out)
+
+
+@kasus("B3")
+def test_b3_old_extension_read_as_before():
+    p = b_proyek("b3")
+    tulis(p, "src/data.log", PAT.encode() + b"\n\x00\n")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out) == 6, "B3 data.log ber-NUL tetap dibaca (ekstensi lama): 6", out)
+
+
+@kasus("B4")
+def test_b4_ignored_folder():
+    p = b_proyek("b4")
+    tulis(p, "src/node_modules/x.jsx", f"// {PAT}\n")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out) == 5, "B4 src/node_modules/x.jsx diabaikan: tetap 5", out)
+
+
+@kasus("B5")
+def test_b5_prose_claim():
+    p = b_proyek("b5")
+    rc1, out1 = lari(p, "REPORT-001.md", '# REPORT-001\n## Ringkasan Fakta\n- Pemakai: hitung(src, "WidgetAlpha")=5\n' + PERIKSA_T)
+    rc2, out2 = lari(p, "REPORT-001.md", '# REPORT-001\n## Ringkasan Fakta\n- Pemakai: hitung(src, "WidgetAlpha")=4\n' + PERIKSA_T)
+    cek(rc1 == 0 and "0 ERROR" in out1 and rc2 == 1 and "padahal 5 baris di src cocok" in out2,
+        "B5 klaim prosa =5 benar, =4 ERROR hitung ulang", out1 + out2)
+
+
+@kasus("B6")
+def test_b6_only_binary():
+    p = proyek("b6")
+    tulis(p, "src/logo.png", b"\x89PNG\x00\x01")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(rc == 1 and "tidak berisi file teks" in out, "B6 folder hanya berisi logo.png: tidak berisi file teks", out)
+
+
+@kasus("B7")
+def test_b7_at_rev():
+    p = b_proyek("b7", git_=True)
+    git(p, "add", "-A")
+    git(p, "commit", "-q", "-m", "satu")
+    rc, out = lari(p, "REPORT-001.md", r_none(), "--at", "HEAD")
+    cek(rc == 1 and "status NONE, padahal 5 baris di src cocok" in out, "B7 B1 pada mode --at <rev>: sama, 5 baris", out)
+
+
+@kasus("B8")
+def test_b8_new_extension_with_nul():
+    p = b_proyek("b8")
+    tulis(p, "src/blob.css", PAT.encode() + b"\n\x00\x01")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out) == 5, "B8 blob.css ber-NUL tidak dihitung: tetap 5", out)
+
+
+@kasus("B9")
+def test_b9_nul_at_boundary():
+    awal = PAT.encode() + b"\n"
+    pa_ = proyek("b9a")
+    tulis(pa_, "src/a.dat", awal + b"x" * (8191 - len(awal)) + b"\x00")
+    rc1, out1 = lari(pa_, "REPORT-001.md", r_none())
+    pb = proyek("b9b")
+    tulis(pb, "src/b.dat", awal + b"x" * (8192 - len(awal)) + b"\x00")
+    rc2, out2 = lari(pb, "REPORT-001.md", r_none())
+    cek("tidak berisi file teks" in out1 and n_cocok(out2) == 1,
+        "B9 NUL di offset 8191 dilewati; NUL di offset 8192 tidak mencegah dihitung", out1 + out2)
+
+
+@kasus("B10")
+def test_b10_no_extension_dotfile_case():
+    p = proyek("b10")
+    for f in ("README", ".eslintrc", "App.JSX", "PIC.PNG"):
+        tulis(p, f"src/{f}", f"// {PAT}\n")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out) == 3, "B10 README, .eslintrc, App.JSX dihitung; PIC.PNG tidak: 3", out)
+
+
+@kasus("B11")
+def test_b11_latin1_without_nul():
+    p = proyek("b11")
+    tulis(p, "src/latin.dat", b"\xff\xfe\n" + PAT.encode() + b"\n")
+    rc, out = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out) == 1 and "Traceback" not in out, "B11 file 0xFF tanpa NUL dihitung, tanpa galat", out)
+
+
+@kasus("B12")
+def test_b12_at_rev_follows_commit():
+    p = proyek("b12", git=True)
+    tulis(p, "src/main.js", "export const a = 1;\n")
+    tulis(p, "src/App.jsx", f"// {PAT}\n")
+    tulis(p, "src/more.jsx", f"// {PAT}\n")
+    tulis(p, "src/blob.dat", PAT.encode() + b"\n\x00")
+    git(p, "add", "-A")
+    git(p, "commit", "-q", "-m", "satu")
+    tulis(p, "src/App.jsx", PAT.encode() + b"\n\x00")
+    tulis(p, "src/more.jsx", PAT.encode() + b"\n\x00")
+    tulis(p, "src/blob.dat", f"// {PAT}\n")
+    rc1, out1 = lari(p, "REPORT-001.md", r_none(), "--at", "HEAD")
+    rc2, out2 = lari(p, "REPORT-001.md", r_none())
+    cek(n_cocok(out1) == 2 and n_cocok(out2) == 1, "B12 --at HEAD mengikuti commit (2); working tree kebalikannya (1)", out1 + out2)
+
+
+# ---- C ----
+def c_proyek(nama):
+    p = proyek(nama)
+    tulis(p, "src/App.jsx", "// lulus=3/3\n")
+    tulis(p, "src/app.js", "// lulus=3/3\n")
+    return p
+
+
+def r_bukti(bukti, teramati="lulus=3/3", harapan="lulus=3/3", ekstra=""):
+    return ("# REPORT-001\n## Data yang Diminta\n" + TABEL + f"| K1 | {harapan} | {teramati} | {bukti} | OK |\n\n" + ekstra + PERIKSA_T)
+
+
+@kasus("C1")
+def test_c1_jsx_reference_in_table():
+    p = c_proyek("c1")
+    rc, out = lari(p, "REPORT-001.md", r_bukti("src/App.jsx:1"))
+    rc1, o1 = lari(p, "REPORT-001.md", r_bukti("src/App.jsx:1", "lulus=9/9", "-"))
+    rc2, o2 = lari(p, "REPORT-001.md", r_bukti("src/app.js:1", "lulus=9/9", "-"))
+    m1 = [l for l in o1.splitlines() if "tidak terlihat" in l]
+    m2 = [l for l in o2.splitlines() if "tidak terlihat" in l]
+    cek(rc == 0 and "tanpa rujukan" not in out and len(m1) == 1 and m1 == m2,
+        "C1 Bukti src/App.jsx:1 dicek; Teramati yang tidak terlihat memberi ERROR yang sama dengan .js", out + o1 + o2)
+
+
+@kasus("C2")
+def test_c2_jsx_reference_in_evidence_block():
+    p = c_proyek("c2")
+    rc1, o1 = lari(p, "REPORT-001.md", "# REPORT-001\n```bukti\nsrc/App.jsx:1 | // lulus=3/3\n```\n" + PERIKSA_T)
+    rc2, o2 = lari(p, "REPORT-001.md", "# REPORT-001\n```bukti\nsrc/App.jsx:1 | isi salah\n```\n" + PERIKSA_T)
+    cek(rc1 == 0 and "1 bukti dicek" in o1 and rc2 == 1 and "tidak sama dengan isi baris" in o2 and "tidak berformat" not in o2,
+        "C2 blok bukti dengan .jsx: dicek; isi salah memberi ERROR kutipan, bukan ERROR format", o1 + o2)
+
+
+@kasus("C3")
+def test_c3_six_extensions():
+    p = proyek("c3")
+    ref = [("a/util.go", 1), ("lib/x.rs", 2), ("a/B.java", 3), ("x.vue", 1), ("s.css", 4), ("t.tsx", 9)]
+    for n, _ in ref:
+        tulis(p, n, L15)
+    blok = "".join(f"{n}:{i} | L{i}\n" for n, i in ref)
+    rc, out = lari(p, "REPORT-001.md", "# REPORT-001\n```bukti\n" + blok + "```\n" + PERIKSA_T)
+    cek(rc == 0 and "6 bukti dicek" in out, "C3 .go .rs .java .vue .css .tsx dikenali: 6 bukti dicek", out)
+
+
+@kasus("C4")
+def test_c4_host_port_and_version_text():
+    p = c_proyek("c4")
+    isi = r_bukti("src/app.js:1")
+    isi = isi.replace("\n\n", "\n| K2 | - | - | example.com:8080 localhost:3000 127.0.0.1:8080 v3.24:1 | UNTESTED |\n\n", 1)
+    isi += "\nLayanan lokal: example.com:8080, localhost:3000, 127.0.0.1:8080, v3.24:1.\n"
+    rc, out = lari(p, "REPORT-001.md", isi)
+    cek(rc == 0 and "0 ERROR, 0 WARNING" in out, "C4 host:port dan versi:baris bukan rujukan file", out)
+
+
+@kasus("C5")
+def test_c5_compiler_output_block():
+    p = c_proyek("c5")
+    a = r_bukti("src/app.js:1", ekstra="```\nsrc/App.tsx:26:10 - error TS2322\n```\n")
+    b = r_bukti("src/app.js:1", ekstra="```\nsrc/app.ts:26:10 - error TS2322\n```\n")
+    rc1, o1 = lari(p, "REPORT-001.md", a)
+    rc2, o2 = lari(p, "REPORT-001.md", b)
+    cek(rc1 == rc2 and o1 == o2, "C5 keluaran kompiler .tsx:26:10 di blok kode diperlakukan sama dengan .ts", o1 + o2)
+
+
+@kasus("C6")
+def test_c6_fourteen_extensions_full_names():
+    p = proyek("c6")
+    ref = [("a.c", 1), ("a.cc", 2), ("a.cs", 3), ("a.css", 4), ("a.h", 5), ("a.hh", 6), ("a.hxx", 7), ("a.ts", 8),
+           ("a.tsx", 9), ("a.mts", 10), ("a.js", 12), ("a.jsx", 13), ("a.mjs", 14), ("a.cjs", 15)]
+    for n, _ in ref:
+        tulis(p, n, L15)
+    blok = "".join(f"{n}:{i} | L{i}\n" for n, i in ref)
+    rc, out = lari(p, "REPORT-001.md", "# REPORT-001\n```bukti\n" + blok + "```\n" + PERIKSA_T)
+    cek(rc == 0 and "14 bukti dicek" in out, "C6 empat belas ekstensi yang berawalan sama dikenali dengan nama utuh: 14 bukti dicek", out)
+
+
+@kasus("C7")
+def test_c7_missing_jsx_file():
+    p = c_proyek("c7")
+    rc1, o1 = lari(p, "REPORT-001.md", r_bukti("src/Missing.jsx:1"))
+    rc2, o2 = lari(p, "REPORT-001.md", r_bukti("src/Missing.js:1"))
+    cek("file src/Missing.jsx tidak ada" in o1 and "tanpa rujukan" not in o1 and "file src/Missing.js tidak ada" in o2,
+        "C7 rujukan .jsx ke file yang tidak ada: pesan `file ... tidak ada`, sama dengan .js", o1 + o2)
+
+
+@kasus("C8")
+def test_c8_tsx_line_and_column_in_cell():
+    p = c_proyek("c8")
+    rc1, o1 = lari(p, "REPORT-001.md", r_bukti("src/App.tsx:26:10"))
+    rc2, o2 = lari(p, "REPORT-001.md", r_bukti("src/app.ts:26:10"))
+    cek(rc1 == rc2 and o1 == o2, "C8 sel Bukti src/App.tsx:26:10 berperilaku sama dengan src/app.ts:26:10", o1 + o2)
+
+
+@kasus("C9-jsx")
+def test_c9_uppercase_jsx_recognized():
+    p = proyek("c9a")
+    tulis(p, "src/App.JSX", "// lulus=3/3\n")
+    rc, out = lari(p, "REPORT-001.md", r_bukti("src/App.JSX:1"))
+    cek(rc == 0 and "tanpa rujukan" not in out and "1 bukti dicek" in out, "C9-jsx src/App.JSX:1 dikenali", out)
+
+
+@kasus("C9-makefile")
+def test_c9_makefile_not_recognized():
+    p = proyek("c9b")
+    tulis(p, "Makefile", "a\nb\nlulus=3/3\n")
+    rc, out = lari(p, "REPORT-001.md", r_bukti("Makefile:3"))
+    cek(rc == 1 and "status OK tanpa rujukan file:baris" in out, "C9-makefile Makefile:3 tidak dikenali (di luar lingkup)", out)
+
+
+@kasus("C10")
+def test_c10_ccTLD_in_prose():
+    p = c_proyek("c10")
+    isi = r_bukti("src/app.js:1", ekstra="Layanan: db.example.cc:5432, cache.example.rs:6379, x.example.tf:443.\n")
+    rc, out = lari(p, "REPORT-001.md", isi)
+    cek(rc == 0 and "0 ERROR, 0 WARNING" in out, "C10 host:port berakhiran mirip ekstensi di prosa: tanpa temuan", out)
+
+
+try:
+    for id_, fn in KASUS:
+        try:
+            fn()
+        except Exception as e:  # satu kasus yang rusak tidak menghentikan kasus lain
+            cek(False, f"{id_} uji berhenti: {type(e).__name__}: {e}")
+finally:
+    shutil.rmtree(tmp2, ignore_errors=True)
 print("\nRESULT:", "ALL OK" if ok else "SOME FAILED")
 sys.exit(0 if ok else 1)
